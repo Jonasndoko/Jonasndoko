@@ -1,0 +1,27 @@
+{% extends "travaux_base.html" %}
+{% block contenu %}
+<p class="sous">Un utilisateur a oublié son mot de passe : vérifiez son identité, puis « Code de récupération ». Le système fabrique un code que vous lui dites de vive voix ; il disparaît après {{ regles.duree // 60 }} minute(s), ne sert qu'une fois et est détruit après {{ regles.essais }} essais faux. L'utilisateur le saisit sur la page <a class="lien" href="/mot-de-passe-oublie">Mot de passe oublié</a> et choisit lui-même son nouveau mot de passe.</p>
+<p class="sous" style="font-size:.82rem">Règles en vigueur : mot de passe de {{ regles.mdp_min }} à {{ regles.mdp_max }} caractères (majuscule, minuscule, chiffre, symbole) · blocage du compte après {{ regles.echecs }} échecs ({{ regles.blocage }} min, doublé à chaque blocage, {{ regles.blocage_max }} h au plus) · session fermée après {{ regles.inactivite }} min d'inactivité</p>
+<div class="carte"><div class="defile"><table class="tableau">
+  <tr><th>Nom complet</th><th>Identifiant</th><th>Poste</th><th>État du compte</th><th>Code de récupération</th><th>Dernière connexion</th><th>Actions</th></tr>
+  {% for c in comptes %}
+  <tr class="{{ 'inactif' if not c.actif else '' }}">
+    <td>{{ c.nom }}</td><td>{{ c.login }}</td><td>{{ c.poste }}</td>
+    <td><span class="badge {{ c.classe }}">{{ c.etat }}</span></td>
+    <td>{% if c.code %}Valable encore {{ c.code }}{% else %}—{% endif %}</td>
+    <td>{{ c.derniere|horo if c.derniere else '—' }}</td>
+    <td style="white-space:nowrap">
+      {% if c.actif and not c.soi %}<form method="post" action="{{ url_for('travaux_auth_code') }}" onsubmit="return confirm('Générer un code de récupération pour {{ c.nom|replace("'", "’") }} ?\nVérifiez d\'abord que c\'est bien cette personne qui le demande. Le code s\'affiche une seule fois ; un code déjà en cours sera remplacé.')"><input type="hidden" name="id" value="{{ c.id }}"><button class="petit" type="submit">Code de récupération</button></form>{% endif %}
+      {% if c.code %}<form method="post" action="{{ url_for('travaux_auth_annuler_code') }}"><input type="hidden" name="id" value="{{ c.id }}"><button class="second petit" type="submit">Annuler le code</button></form>{% endif %}
+      <form method="post" action="{{ url_for('travaux_auth_provisoire') }}" onsubmit="return confirm('Donner un nouveau mot de passe provisoire à {{ c.nom|replace("'", "’") }} ?\nL\'ancien mot de passe cessera de fonctionner et un code de récupération en cours sera détruit.')"><input type="hidden" name="id" value="{{ c.id }}"><button class="second petit" type="submit">Mot de passe provisoire</button></form>
+      <form method="post" action="{{ url_for('travaux_auth_debloquer') }}"><input type="hidden" name="id" value="{{ c.id }}"><button class="second petit" type="submit">Débloquer</button></form>
+    </td>
+  </tr>{% endfor %}
+</table></div></div>
+<div class="carte espace">
+  <h2 style="margin:0 0 10px;font-size:1.05rem">Dernières opérations d'authentification</h2>
+  <div class="defile"><table class="tableau"><tr><th>Date et heure</th><th>Identifiant</th><th>Opération</th><th>Détail</th></tr>
+  {% for j in journal %}<tr><td>{{ j.date|horo }}</td><td>{{ j.login }}</td><td>{{ j.action }}</td><td>{{ j.detail }}</td></tr>{% else %}<tr><td colspan="4" class="sous">Rien pour l'instant.</td></tr>{% endfor %}
+  </table></div>
+</div>
+{% endblock %}

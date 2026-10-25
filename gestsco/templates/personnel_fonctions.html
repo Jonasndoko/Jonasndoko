@@ -1,0 +1,34 @@
+{% extends "personnel_base.html" %}
+{% block contenu %}
+<p class="sous">Les fonctions (Enseignant, Secrétaire…) et les services (Administration, Discipline…) proposés lors des affectations. Une fonction ou un service déjà utilisé ne se supprime pas : on le désactive, l'historique reste.</p>
+{% for genre, titre, lignes in blocs %}
+<div class="carte espace">
+  <h2 style="margin:0 0 10px;font-size:1.05rem">{{ titre }}</h2>
+  {% if lignes %}
+  <div class="defile"><table class="tableau">
+    <tr><th>Nom</th><th class="nb">Agents actuels</th><th class="nb">Affectations</th><th>État</th><th>Actions</th></tr>
+    {% for r in lignes %}
+    <tr>
+      <td>{% if d.modif %}
+        <form method="post" action="/m/personnel/fonctions"><input type="hidden" name="genre" value="{{ genre }}"><input type="hidden" name="action" value="renommer"><input type="hidden" name="id" value="{{ r.id }}">
+          <input type="text" name="libelle" value="{{ r.libelle }}" maxlength="60" aria-label="Nom" style="min-width:12rem"><button class="second petit" type="submit">Renommer</button></form>
+        {% else %}{{ r.libelle }}{% endif %}</td>
+      <td class="nb">{{ r.nb_agents }}</td><td class="nb">{{ r.nb_affectations }}</td>
+      <td>{% if r.actif %}<span class="badge encours">Actif</span>{% else %}<span class="badge inactif">Désactivé</span>{% endif %}</td>
+      <td style="white-space:nowrap">
+        {% if d.modif %}<form method="post" action="/m/personnel/fonctions"><input type="hidden" name="genre" value="{{ genre }}"><input type="hidden" name="id" value="{{ r.id }}">
+          <input type="hidden" name="action" value="{{ 'desactiver' if r.actif else 'activer' }}"><button class="second petit" type="submit">{{ 'Désactiver' if r.actif else 'Réactiver' }}</button></form>{% endif %}
+        {% if d.suppr and r.nb_affectations == 0 %}<form method="post" action="/m/personnel/fonctions" onsubmit="return confirm('Supprimer « {{ r.libelle|replace("'", "’") }} » de la liste ?')"><input type="hidden" name="genre" value="{{ genre }}"><input type="hidden" name="id" value="{{ r.id }}"><input type="hidden" name="action" value="supprimer"><button class="danger petit" type="submit">Supprimer</button></form>{% endif %}
+      </td>
+    </tr>{% endfor %}
+  </table></div>
+  {% else %}<p class="sous" style="margin:0">Aucun élément pour l'instant.</p>{% endif %}
+  {% if d.ajout %}
+  <form method="post" action="/m/personnel/fonctions" class="espace">
+    <input type="hidden" name="genre" value="{{ genre }}"><input type="hidden" name="action" value="ajouter">
+    <label for="nouv-{{ genre }}">Ajouter {{ 'une fonction' if genre == 'FONCTION' else 'un service' }}</label>
+    <div class="ligne"><input id="nouv-{{ genre }}" name="libelle" maxlength="60" required value="{{ saisie.libelle if saisie and saisie.genre == genre and saisie.action == 'ajouter' else '' }}"><button type="submit">Ajouter</button></div>
+  </form>{% endif %}
+</div>
+{% endfor %}
+{% endblock %}

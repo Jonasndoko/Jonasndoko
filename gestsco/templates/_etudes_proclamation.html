@@ -1,0 +1,148 @@
+{# Proclamation des résultats : Directrice des études (autorise, choisit les frais, valide, soumet) et Préfet (consulte, change, confirme). #}
+{% set sous = pr.sous %}
+{% set d = pr.detail %}
+{% macro champs() %}<input type="hidden" name="annee" value="{{ pr.annee }}"><input type="hidden" name="classe" value="{{ pr.classe }}"><input type="hidden" name="cle" value="{{ pr.cle }}">{% endmacro %}
+{% if erreur or pr.erreur %}<div class="erreur">{{ erreur or pr.erreur }}</div>{% endif %}
+<div class="carte"><p class="sous" style="margin:0">
+{% if sous == 'direction_etudes' %}
+Vous autorisez le titulaire, choisissez les frais exigés (tranche demandée ou totalité), validez les bulletins des élèves <b>en ordre</b>, puis soumettez la proclamation au Préfet. Le titulaire consulte toujours les bulletins ; il n'imprime que les bulletins validés, une fois la proclamation confirmée par le Préfet. Aucun montant n'est affiché ici : seulement « en ordre » ou non.
+{% else %}
+Vous consultez les validations de la Directrice des études, pouvez changer sa décision pour un élève (avec un motif), puis confirmer la proclamation. Après votre confirmation, le titulaire imprime les bulletins validés.
+{% endif %}</p></div>
+<div class="espace"></div>
+
+<form method="get" class="carte">
+  <input type="hidden" name="f" value="proclamation">
+  <div class="ligne">
+    <select name="annee" aria-label="Année scolaire" style="max-width:160px" onchange="this.form.submit()">
+      {% for a in pr.liste.annees %}<option value="{{ a }}" {{ 'selected' if a == pr.annee else '' }}>{{ a }}</option>{% endfor %}
+    </select>
+    {% if sous == 'direction_etudes' %}
+    <select name="classe" aria-label="Classe"><option value="">Choisir une classe</option>
+      {% for k in pr.classes %}<option value="{{ k.n_classe }}" {{ 'selected' if pr.classe == k.n_classe|string else '' }}>{{ k.designation }}</option>{% endfor %}
+    </select>
+    <select name="cle" aria-label="Période, semestre ou année"><option value="">Choisir la période</option>
+      {% for p in pr.portees %}<option value="{{ p.cle }}" {{ 'selected' if pr.cle == p.cle else '' }}>{{ p.semestre ~ ' - ' ~ p.libelle if p.type == 'periode' else p.libelle }}</option>{% endfor %}
+    </select>
+    <button type="submit">Ouvrir</button>
+    {% endif %}
+  </div>
+</form>
+<div class="espace"></div>
+
+<h3 class="sec">Proclamations de l'année {{ pr.annee }}</h3>
+<div class="carte defile">
+{% if pr.liste.proclamations %}
+<table class="tableau"><thead><tr><th>Classe</th><th>Période</th><th>Statut</th><th>Bulletins validés</th><th></th></tr></thead><tbody>
+  {% for l in pr.liste.proclamations %}
+  <tr><td>{{ l.classe }}</td><td>{{ l.portee }}</td><td>{{ l.statut_libelle }}</td><td>{{ l.valides }}</td>
+    <td><a class="lien" href="{{ url_for('etudes_sous_menu', sous=sous, f='proclamation', annee=pr.annee, classe=l.n_classe, cle=l.cle) }}">Ouvrir</a></td></tr>
+  {% endfor %}
+</tbody></table>
+{% else %}<p class="sous" style="margin:0">Aucune proclamation pour cette année.</p>{% endif %}
+</div>
+
+{% if d %}
+<div class="espace"></div>
+<h3 class="sec">{{ d.classe }} · {{ d.portee }}</h3>
+<div class="carte"><p style="margin:0"><b>Statut :</b> {{ d.statut_libelle }}
+  {% if d.transmise_le %} · soumise le {{ d.transmise_le }}{% endif %}{% if d.confirmee_le %} · confirmée le {{ d.confirmee_le }}{% endif %}</p></div>
+<div class="espace"></div>
+
+{# ---- étape 1 : autorisation du titulaire #}
+{% if not d.statut %}
+  {% if sous == 'direction_etudes' and d.peut_direction %}
+  <form method="post" action="{{ url_for('etudes_proclamation_action', sous=sous, action='autoriser') }}" class="carte">
+    {{ champs() }}
+    <p style="margin:0 0 8px">Le titulaire de cette classe n'est pas encore autorisé pour cette période.</p>
+    <button type="submit">Autoriser le titulaire</button>
+  </form>
+  {% else %}<div class="carte"><p class="sous" style="margin:0">La Directrice des études n'a pas encore autorisé cette période.</p></div>{% endif %}
+{% else %}
+
+{# ---- étape 2 : frais exigés #}
+<div class="carte">
+  <h2 style="margin:0 0 8px;font-size:1.05rem">Frais exigés pour être « en ordre »</h2>
+  {% if sous == 'direction_etudes' and d.statut == 'AUTORISEE' and d.peut_direction %}
+  <form method="post" action="{{ url_for('etudes_proclamation_action', sous=sous, action='criteres') }}">
+    {{ champs() }}
+    {% for f in pr.frais %}
+    {% set choix = (d.criteres | selectattr('codtf', 'equalto', f.codtf) | list | first) %}
+    <div class="ligne" style="margin:0 0 6px"><label style="min-width:14rem">{{ f.designation }}</label>
+      <select name="frais_{{ f.codtf }}" aria-label="{{ f.designation }}">
+        <option value="">Non exigé</option>
+        <option value="T" {{ 'selected' if choix and choix.tranche is none else '' }}>Totalité</option>
+        {% if f.par_tranche %}{% for t in range(1, f.nb_tranches + 1) %}<option value="{{ t }}" {{ 'selected' if choix and choix.tranche == t else '' }}>Jusqu'à la tranche {{ t }}</option>{% endfor %}{% endif %}
+      </select></div>
+    {% endfor %}
+    {% if not pr.frais %}<p class="sous">Aucun type de frais n'est défini pour cette classe.</p>{% endif %}
+    <button type="submit">Enregistrer les frais exigés</button>
+  </form>
+  {% elif d.criteres %}
+  <ul style="margin:0;padding-left:18px">{% for c in d.criteres %}<li>{{ c.designation }} : {{ ('jusqu\'à la tranche ' ~ c.tranche) if c.tranche else 'totalité' }}</li>{% endfor %}</ul>
+  {% else %}<p class="sous" style="margin:0">Aucun frais choisi pour le moment.</p>{% endif %}
+</div>
+<div class="espace"></div>
+
+{# ---- étapes 3 à 5 : élèves #}
+<div class="chiffres">
+  <div class="chiffre"><b>{{ d.resume.eleves }}</b><span>Élèves</span></div>
+  <div class="chiffre vert"><b>{{ d.resume.en_ordre }}</b><span>En ordre</span></div>
+  <div class="chiffre"><b>{{ d.resume.valides }}</b><span>Bulletins validés</span></div>
+  <div class="chiffre rouge"><b>{{ d.resume.en_attente }}</b><span>Résultats en attente</span></div>
+</div>
+{% set peut_valider = sous == 'direction_etudes' and d.statut == 'AUTORISEE' and d.peut_direction %}
+{% set peut_changer = sous == 'prefecture' and d.statut in ('TRANSMISE', 'CONFIRMEE') and d.peut_prefet %}
+{% if peut_changer %}{% for e in d.eleves %}<form id="dec-{{ loop.index }}" method="post" action="{{ url_for('etudes_proclamation_action', sous=sous, action='decision') }}"></form>{% endfor %}{% endif %}
+{% if peut_valider %}<form id="val" method="post" action="{{ url_for('etudes_proclamation_action', sous=sous, action='valider') }}">{{ champs() }}</form>{% endif %}
+<div class="carte defile">
+<table class="tableau">
+  <thead><tr>{% if peut_valider %}<th></th>{% endif %}<th>Élève</th><th>%</th><th>Résultat</th>
+    <th>{{ 'En ordre' if d.criteres else 'En ordre (frais à choisir)' }}</th><th>Bulletin</th>{% if peut_changer %}<th>Changer la décision</th>{% endif %}</tr></thead>
+  <tbody>
+  {% for e in d.eleves %}
+  <tr>
+    {% if peut_valider %}<td><input type="checkbox" name="matricule" value="{{ e.matricule }}" form="val" aria-label="Choisir {{ e.nom_complet }}"></td>{% endif %}
+    <td>{{ e.nom_complet }}<div class="sous" style="font-size:.78rem">{{ e.matricule }}</div></td>
+    <td>{{ ('%.1f' % e.pct) if e.pct is not none else '-' }}</td><td>{{ e.resultat }}</td>
+    <td>{% if e.en_ordre is none %}-{% elif e.en_ordre %}<b>En ordre</b>{% else %}Pas en ordre<div class="sous" style="font-size:.78rem">{{ e.manques | join(' ; ') }}</div>{% endif %}</td>
+    <td>{% if e.valide %}<b>Validé</b>{% else %}Non validé{% endif %}
+      {% if e.decision and e.decision.origine == 'PREFET' %}<div class="sous" style="font-size:.78rem">Décision du Préfet ({{ e.decision.le }}) : {{ e.decision.motif }}</div>{% endif %}</td>
+    {% if peut_changer %}
+    <td>
+      <input type="hidden" name="annee" value="{{ pr.annee }}" form="dec-{{ loop.index }}"><input type="hidden" name="classe" value="{{ pr.classe }}" form="dec-{{ loop.index }}">
+      <input type="hidden" name="cle" value="{{ pr.cle }}" form="dec-{{ loop.index }}"><input type="hidden" name="matricule" value="{{ e.matricule }}" form="dec-{{ loop.index }}">
+      <input type="hidden" name="valide" value="{{ '0' if e.valide else '1' }}" form="dec-{{ loop.index }}">
+      <input type="text" name="motif" maxlength="300" placeholder="Motif" aria-label="Motif pour {{ e.nom_complet }}" form="dec-{{ loop.index }}" required style="min-width:10rem">
+      <button type="submit" form="dec-{{ loop.index }}" class="{{ 'clair' if e.valide else '' }}">{{ 'Retirer la validation' if e.valide else 'Valider' }}</button>
+    </td>
+    {% endif %}
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% if peut_valider %}
+<div class="espace"></div>
+<div class="ligne">
+  <button type="submit" form="val">Valider les élèves cochés</button>
+  <button type="submit" form="val" formaction="{{ url_for('etudes_proclamation_action', sous=sous, action='retirer') }}" class="clair">Retirer la validation des élèves cochés</button>
+  <button type="submit" form="val" formaction="{{ url_for('etudes_proclamation_action', sous=sous, action='valider_ordre') }}">Valider tous les élèves en ordre</button>
+</div>
+<div class="espace"></div>
+<form method="post" action="{{ url_for('etudes_proclamation_action', sous=sous, action='soumettre') }}" class="carte">
+  {{ champs() }}
+  <p style="margin:0 0 8px">Quand vos validations sont terminées, soumettez la proclamation au Préfet : vous ne pourrez plus rien y changer.</p>
+  <button type="submit">Soumettre au Préfet</button>
+</form>
+{% endif %}
+{% if sous == 'prefecture' and d.statut == 'TRANSMISE' and d.peut_prefet %}
+<div class="espace"></div>
+<form method="post" action="{{ url_for('etudes_proclamation_action', sous=sous, action='confirmer') }}" class="carte">
+  {{ champs() }}
+  <p style="margin:0 0 8px">Confirmer la proclamation : le titulaire pourra imprimer les {{ d.resume.valides }} bulletin(s) validé(s).</p>
+  <button type="submit">Confirmer la proclamation</button>
+</form>
+{% endif %}
+{% endif %}
+{% endif %}

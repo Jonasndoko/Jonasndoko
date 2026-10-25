@@ -1,0 +1,17 @@
+{# Champs communs du formulaire agent. Variables : valeurs, statuts, desactive (bool) #}
+<div class="grille-form">
+  <div><label for="nom" class="obligatoire">Nom</label><input id="nom" name="nom" value="{{ valeurs.nom }}" required maxlength="60" {{ 'disabled' if desactive }}></div>
+  <div><label for="postnom">Postnom</label><input id="postnom" name="postnom" value="{{ valeurs.postnom }}" maxlength="60" {{ 'disabled' if desactive }}></div>
+  <div><label for="prenom">Prénom</label><input id="prenom" name="prenom" value="{{ valeurs.prenom }}" maxlength="60" {{ 'disabled' if desactive }}></div>
+  <div><label for="sexe" class="obligatoire">Sexe</label>
+    <select id="sexe" name="sexe" required {{ 'disabled' if desactive }}><option value="">—</option>
+      <option value="M" {{ 'selected' if valeurs.sexe == 'M' }}>Masculin</option><option value="F" {{ 'selected' if valeurs.sexe == 'F' }}>Féminin</option></select></div>
+  <div><label for="date_naissance" class="obligatoire">Date de naissance</label><input id="date_naissance" name="date_naissance" type="date" value="{{ valeurs.date_naissance }}" required {{ 'disabled' if desactive }}></div>
+  <div><label for="telephone" class="obligatoire">Téléphone</label><input id="telephone" name="telephone" type="tel" value="{{ valeurs.telephone }}" required maxlength="30" {{ 'disabled' if desactive }}></div>
+  <div class="large"><label for="adresse" class="obligatoire">Adresse</label><input id="adresse" name="adresse" value="{{ valeurs.adresse }}" required maxlength="200" {{ 'disabled' if desactive }}></div>
+  <div><label for="email">E-mail</label><input id="email" name="email" type="email" value="{{ valeurs.email }}" maxlength="120" {{ 'disabled' if desactive }}></div>
+  <div><label for="date_engagement" class="obligatoire">Date d'engagement</label><input id="date_engagement" name="date_engagement" type="date" value="{{ valeurs.date_engagement }}" required {{ 'disabled' if desactive }}></div>
+  <div><label for="statut_pro" class="obligatoire">Statut professionnel</label>
+    <select id="statut_pro" name="statut_pro" required {{ 'disabled' if desactive }}><option value="">—</option>
+      {% for cle, lib in statuts.items() %}<option value="{{ cle }}" {{ 'selected' if valeurs.statut_pro == cle }}>{{ lib }}</option>{% endfor %}</select></div>
+</div>

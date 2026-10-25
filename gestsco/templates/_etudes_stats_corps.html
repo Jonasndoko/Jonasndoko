@@ -1,0 +1,111 @@
+{# Corps des statistiques et rapports scolaires (statistiques_scolaires.py) : partagé par la page et la page imprimable. Variables : vue, s, c. #}
+{% macro pc(v) %}{{ (v|string|replace('.', ',') ~ ' %') if v is not none else '—' }}{% endmacro %}
+{% macro pts(o, m) %}{% if o is not none %}{{ o }} / {{ m }}{% else %}—{% endif %}{% endmacro %}
+{% macro delta(d) %}{% if d is none %}{% elif d > 0 %}<span class="st-hausse" title="Évolution par rapport à la colonne précédente">▲ +{{ d|string|replace('.', ',') }}</span>{% elif d < 0 %}<span class="st-baisse" title="Évolution par rapport à la colonne précédente">▼ {{ d|string|replace('.', ',') }}</span>{% else %}<span class="st-egal">＝</span>{% endif %}{% endmacro %}
+{% macro ecole_resume(e) %}
+<div class="st-chiffres resume">
+  <div class="st-chiffre"><b>{{ pc(e.moyenne) }}</b><span>Moyenne de l'école</span></div>
+  <div class="st-chiffre"><b>{{ pc(e.taux_reussite) }}</b><span>Taux de réussite ({{ e.reussis }})</span></div>
+  <div class="st-chiffre"><b>{{ pc(e.taux_echec) }}</b><span>Taux d'échec ({{ e.echecs }})</span></div>
+  <div class="st-chiffre"><b>{{ e.attente }}</b><span>Résultat(s) en attente</span></div>
+  <div class="st-chiffre"><b>{{ e.effectif }}</b><span>Élève(s) dans {{ e.nb_classes }} classe(s)</span></div>
+</div>
+{% endmacro %}
+
+{% if vue == 'comparaison' %}
+{% set C = c %}
+{% if not C.colonnes %}<div class="carte"><p class="sous" style="margin:0">Aucune période n'est définie pour le secondaire en {{ C.annee }}.</p></div>
+{% else %}
+<h3 class="st-sec">Comparaison des moyennes entre les périodes · {{ C.niveaux[C.niveau] }}{% if C.classe %} · {{ C.classe }}{% endif %}</h3>
+<div class="st-defile">
+<table class="tableau">
+  <thead><tr><th>{{ {'classes':'Classe','cours':'Cours','eleves':'Élève'}[C.niveau] }}</th>
+    {% for col in C.colonnes %}<th class="nb n">{{ col.libelle if col.type != 'periode' else col.semestre ~ ' · ' ~ col.libelle }}</th>{% endfor %}<th class="nb n" title="Dernière période moins première période">Tendance</th></tr></thead>
+  <tbody>
+  {% for l in C.lignes %}
+    <tr><td>{{ l.libelle }}{% if l.sous %}<div class="sous" style="font-size:.76rem">{{ l.sous }}</div>{% endif %}</td>
+    {% for col in C.colonnes %}{% set x = l.moyennes[col.cle] %}<td class="nb n">{{ pc(x.valeur) }} {{ delta(x.delta) }}</td>{% endfor %}
+    <td class="nb n">{{ delta(l.tendance) }}</td></tr>
+  {% else %}<tr><td colspan="{{ C.colonnes|length + 2 }}" class="sous">Rien à comparer.</td></tr>{% endfor %}
+  </tbody>
+  {% if C.ecole %}<tfoot><tr><td>{{ C.ecole.libelle }}</td>{% for col in C.colonnes %}{% set x = C.ecole.moyennes[col.cle] %}<td class="nb n">{{ pc(x.valeur) }} {{ delta(x.delta) }}</td>{% endfor %}<td class="nb n">{{ delta(C.ecole.tendance) }}</td></tr></tfoot>{% endif %}
+</table>
+</div>
+{% if C.niveau != 'eleves' %}
+<h3 class="st-sec">Taux de réussite</h3>
+<div class="st-defile">
+<table class="tableau">
+  <thead><tr><th>{{ 'Classe' if C.niveau == 'classes' else 'Cours' }}</th>{% for col in C.colonnes %}<th class="nb n">{{ col.libelle if col.type != 'periode' else col.semestre ~ ' · ' ~ col.libelle }}</th>{% endfor %}</tr></thead>
+  <tbody>{% for l in C.lignes %}<tr><td>{{ l.libelle }}</td>{% for col in C.colonnes %}<td class="nb n">{{ pc(l.taux[col.cle]) }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+  {% if C.ecole %}<tfoot><tr><td>{{ C.ecole.libelle }}</td>{% for col in C.colonnes %}<td class="nb n">{{ pc(C.ecole.taux[col.cle]) }}</td>{% endfor %}</tr></tfoot>{% endif %}
+</table>
+</div>
+{% endif %}
+<p class="st-note">▲ / ▼ : écart en points de pourcentage avec la colonne précédente du même genre (période avec période, examen avec examen, semestre avec semestre). Tendance : dernière période moins première période.</p>
+{% endif %}
+
+{% elif s %}
+{% set S = s %}
+{% if not S.ecole %}
+<div class="carte"><p class="sous" style="margin:0">Aucune classe du secondaire n'a de période définie en {{ S.annee }} : définissez les semestres et périodes (Direction des études &gt; Années, semestres et périodes).</p></div>
+{% else %}
+<p class="st-note"><b>{{ S.portee }}</b> · {{ S.annee }} · seuil de réussite {{ '%.0f' % S.seuil }} %.</p>
+
+{% if vue == 'moyennes' %}
+{{ ecole_resume(S.ecole) }}
+<h3 class="st-sec">Moyenne par classe</h3>
+<div class="st-defile"><table class="tableau">
+  <thead><tr><th class="nb n">Rang</th><th>Classe</th><th>Titulaire</th><th class="nb n">Élèves</th><th class="nb n">Moyenne</th></tr></thead>
+  <tbody>{% for k in S.classes %}<tr><td class="nb n">{{ k.rang or '—' }}</td><td>{{ k.designation }}{% if k.option %} · {{ k.option }}{% endif %}</td><td>{{ k.titulaire or '—' }}</td><td class="nb n">{{ k.effectif }}</td><td class="nb n">{{ pc(k.moyenne) }}</td></tr>{% endfor %}</tbody>
+  <tfoot><tr><td></td><td>Ensemble de l'école</td><td></td><td class="nb n">{{ S.ecole.effectif }}</td><td class="nb n">{{ pc(S.ecole.moyenne) }}</td></tr></tfoot></table></div>
+<h3 class="st-sec">Moyenne par cours{% if S.classe %} · {{ S.classe.designation }}{% endif %}</h3>
+<div class="st-defile"><table class="tableau">
+  <thead><tr><th>Classe</th><th>Cours</th><th>Professeur</th><th class="nb n">Notes</th><th class="nb n">Moyenne</th></tr></thead>
+  <tbody>{% for c in S.cours %}<tr><td>{{ c.classe }}</td><td>{{ c.cours }}</td><td>{{ c.professeur or '—' }}</td><td class="nb n">{{ c.notes }} / {{ c.attendues }}</td><td class="nb n">{{ pc(c.moyenne) }}</td></tr>{% else %}<tr><td colspan="5" class="sous">Aucun cours.</td></tr>{% endfor %}</tbody></table></div>
+{% if S.classe %}
+<h3 class="st-sec">Moyenne par élève · {{ S.classe.designation }}</h3>
+<div class="st-defile"><table class="tableau">
+  <thead><tr><th class="nb n">Rang</th><th>Élève</th><th class="nb n">Points</th><th class="nb n">Moyenne</th><th>Mention</th><th>Résultat</th></tr></thead>
+  <tbody>{% for e in S.eleves %}<tr><td class="nb n">{{ e.rang or '—' }}</td><td>{{ e.nom }}</td><td class="nb n">{{ pts(e.obtenu, e.max) }}</td><td class="nb n">{{ pc(e.pct) }}</td><td>{{ e.mention or '—' }}</td><td>{{ e.resultat }}</td></tr>{% else %}<tr><td colspan="6" class="sous">Aucun élève.</td></tr>{% endfor %}</tbody></table></div>
+{% else %}<p class="st-note">Choisissez une classe pour afficher la moyenne de chacun de ses élèves.</p>{% endif %}
+
+{% elif vue == 'classement' %}
+{% if not S.classe %}<div class="carte"><p class="sous" style="margin:0">Choisissez une classe pour afficher le classement de ses élèves.</p></div>
+{% else %}
+<h3 class="st-sec">Classement des élèves · {{ S.classe.designation }}{% if S.classe.option %} · {{ S.classe.option }}{% endif %} <span class="sous" style="font-size:.82rem;font-weight:normal">· {{ S.classe.effectif }} élève(s) · moyenne {{ pc(S.classe.moyenne) }}</span></h3>
+<div class="st-defile"><table class="tableau">
+  <thead><tr><th class="nb n">Rang</th><th>Élève</th><th class="nb n">Points</th><th class="nb n">%</th><th>Mention</th><th>Résultat</th><th>Conduite</th></tr></thead>
+  <tbody>{% for e in S.eleves %}<tr><td class="nb n">{{ e.rang or '—' }}</td><td>{{ e.nom }}</td><td class="nb n">{{ pts(e.obtenu, e.max) }}</td><td class="nb n">{{ pc(e.pct) }}</td><td>{{ e.mention or '—' }}</td><td>{{ e.resultat }}{% if not e.complet %} <small>(incomplet)</small>{% endif %}</td><td>{{ e.conduite or '—' }}</td></tr>{% else %}<tr><td colspan="7" class="sous">Aucun élève.</td></tr>{% endfor %}</tbody></table></div>
+<p class="st-note">Règles de l'école : le rang suit le pourcentage obtenu ; deux élèves au même pourcentage ont le même rang (1, 2, 2, 4). Les élèves qui réussissent (au moins {{ '%.0f' % S.seuil }} %) sont listés d'abord, puis ceux qui échouent, puis ceux dont le résultat est « en attente » (points manquants).</p>
+{% endif %}
+
+{% elif vue == 'reussite' %}
+{{ ecole_resume(S.ecole) }}
+<h3 class="st-sec">Réussite et échec par classe</h3>
+<div class="st-defile"><table class="tableau">
+  <thead><tr><th>Classe</th><th class="nb n">Élèves</th><th class="nb n">Réussis</th><th class="nb n">Échecs</th><th class="nb n">En attente</th><th class="nb n">Taux de réussite</th><th class="nb n">Taux d'échec</th></tr></thead>
+  <tbody>{% for k in S.classes %}<tr><td>{{ k.designation }}{% if k.option %} · {{ k.option }}{% endif %}</td><td class="nb n">{{ k.effectif }}</td><td class="nb n">{{ k.reussis }}</td><td class="nb n">{{ k.echecs }}</td><td class="nb n">{{ k.attente }}</td><td class="nb n">{{ pc(k.taux_reussite) }}</td><td class="nb n">{{ pc(k.taux_echec) }}</td></tr>{% endfor %}</tbody>
+  <tfoot><tr><td>Ensemble de l'école</td><td class="nb n">{{ S.ecole.effectif }}</td><td class="nb n">{{ S.ecole.reussis }}</td><td class="nb n">{{ S.ecole.echecs }}</td><td class="nb n">{{ S.ecole.attente }}</td><td class="nb n">{{ pc(S.ecole.taux_reussite) }}</td><td class="nb n">{{ pc(S.ecole.taux_echec) }}</td></tr></tfoot></table></div>
+<h3 class="st-sec">Réussite et échec par cours</h3>
+<div class="st-defile"><table class="tableau">
+  <thead><tr><th>Classe</th><th>Cours</th><th class="nb n">Notes</th><th class="nb n">Réussis</th><th class="nb n">Échecs</th><th class="nb n">Taux de réussite</th><th class="nb n">Taux d'échec</th></tr></thead>
+  <tbody>{% for c in S.cours %}<tr><td>{{ c.classe }}</td><td>{{ c.cours }}</td><td class="nb n">{{ c.notes }}</td><td class="nb n">{{ c.reussis }}</td><td class="nb n">{{ c.echecs }}</td><td class="nb n">{{ pc(c.taux_reussite) }}</td><td class="nb n">{{ pc(c.taux_echec) }}</td></tr>{% else %}<tr><td colspan="7" class="sous">Aucun cours.</td></tr>{% endfor %}</tbody></table></div>
+<p class="st-note">Réussite : pourcentage au moins égal à {{ '%.0f' % S.seuil }} %. Les taux d'une classe ou de l'école portent sur les élèves dont le résultat est décidé ; ceux dont il manque des points sont comptés « en attente ». Les taux d'un cours portent sur les points saisis.</p>
+
+{% elif vue == 'rapports' %}
+{{ ecole_resume(S.ecole) }}
+<h3 class="st-sec">Rapport sur la performance des classes</h3>
+<div class="st-defile"><table class="tableau">
+  <thead><tr><th class="nb n">Rang</th><th>Classe</th><th>Titulaire</th><th class="nb n">Élèves</th><th class="nb n">Moyenne</th><th class="nb n">Taux de réussite</th><th class="nb n">Taux d'échec</th><th class="nb n">En attente</th><th>Appréciation</th></tr></thead>
+  <tbody>{% for k in S.classes %}<tr><td class="nb n">{{ k.rang or '—' }}</td><td>{{ k.designation }}{% if k.option %} · {{ k.option }}{% endif %}</td><td>{{ k.titulaire or '—' }}</td><td class="nb n">{{ k.effectif }}</td><td class="nb n">{{ pc(k.moyenne) }}</td><td class="nb n">{{ pc(k.taux_reussite) }}</td><td class="nb n">{{ pc(k.taux_echec) }}</td><td class="nb n">{{ k.attente }}</td>
+    <td>{% if k.moyenne is none %}Pas de points{% elif k.taux_reussite is not none and k.taux_reussite < 50 %}À soutenir : moins de la moitié des élèves réussissent{% elif S.ecole.moyenne is not none and k.moyenne >= S.ecole.moyenne %}Au-dessus de la moyenne de l'école{% else %}Sous la moyenne de l'école{% endif %}</td></tr>{% endfor %}</tbody></table></div>
+<h3 class="st-sec">Rapport sur la performance des enseignants</h3>
+<div class="st-defile"><table class="tableau">
+  <thead><tr><th class="nb n">Rang</th><th>Enseignant</th><th>Classes</th><th class="nb n">Cours</th><th class="nb n">Points saisis</th><th class="nb n">Taux de saisie</th><th class="nb n">Moyenne des élèves</th><th class="nb n">Taux de réussite</th></tr></thead>
+  <tbody>{% for e in S.enseignants %}<tr><td class="nb n">{{ e.rang or '—' }}</td><td><b>{{ e.nom }}</b></td><td>{{ e.classes|join(', ') }}</td><td class="nb n">{{ e.nb_cours }}</td><td class="nb n">{{ e.notes }} / {{ e.attendues }}</td><td class="nb n">{{ pc(e.taux_saisie) }}</td><td class="nb n">{{ pc(e.moyenne) }}</td><td class="nb n">{{ pc(e.taux_reussite) }}</td></tr>
+    {% for c in e.cours %}<tr class="st-detail"><td></td><td colspan="2">&nbsp;&nbsp;↳ {{ c.cours }} · {{ c.classe }}</td><td></td><td class="nb n">{{ c.notes }} / {{ c.attendues }}</td><td class="nb n">{{ pc((100 * c.notes / c.attendues)|round(1) if c.attendues else none) }}</td><td class="nb n">{{ pc(c.moyenne) }}</td><td class="nb n">{{ pc(c.taux_reussite) }}</td></tr>{% endfor %}
+  {% else %}<tr><td colspan="8" class="sous">Aucun cours n'a de professeur attribué.</td></tr>{% endfor %}</tbody></table></div>
+<p class="st-note">Performance d'un enseignant = résultats des élèves dans ses cours (moyenne de tous les points saisis, taux de réussite) et régularité de la saisie des points (points saisis sur points attendus). Elle dépend aussi du niveau des classes : à lire avec prudence, elle ne remplace pas l'évaluation de l'enseignant.</p>
+{% endif %}
+{% endif %}
+{% endif %}

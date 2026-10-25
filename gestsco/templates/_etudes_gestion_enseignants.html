@@ -1,0 +1,51 @@
+<p class="sous">La charge de chaque professeur pour l'année, l'association d'un professeur à une classe, le titulaire de classe (calcul des résultats et bulletins) et le compte de connexion du professeur à l'espace professeurs.</p>
+<div class="carte">
+  <form method="get" action="{{ url_for('etudes_sous_menu', sous='direction_etudes') }}" class="ligne"><input type="hidden" name="f" value="enseignants">
+    <select name="a" aria-label="Année" style="width:auto">{% for x in annees %}<option {{ 'selected' if x.annee == a else '' }}>{{ x.annee }}</option>{% endfor %}</select>
+    <select name="c" aria-label="Classe">{% for k in classes %}<option value="{{ k.n_classe }}" {{ 'selected' if k.n_classe == c else '' }}>{{ k.designation }}  ({{ k.niveau }}{{ ' - ' ~ k.option if k.option else '' }})</option>{% endfor %}</select>
+    <input type="search" name="q" value="{{ q }}" placeholder="Rechercher un agent…" aria-label="Rechercher" maxlength="60">
+    <label class="case-ligne" style="margin:0"><input type="checkbox" name="seuls" value="1" {{ 'checked' if seuls else '' }}> Enseignants seulement</label>
+    {% if m %}<input type="hidden" name="m" value="{{ m }}">{% endif %}
+    <button class="second" type="submit">Afficher</button>
+  </form>
+</div>
+<div class="grille-form espace" style="grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:14px;align-items:start">
+  <div class="carte">
+    <h2 style="margin:0 0 10px;font-size:1.1rem">Agents en service</h2>
+    <div class="defile"><table class="tableau">
+      <tr><th>Agent</th><th>Fonction</th><th class="nb">Classes</th><th class="nb">Cours</th><th class="nb">Heures</th><th></th></tr>
+      {% for p in profs %}<tr class="{{ 'ligne-choisie' if p.matricule == m else '' }}" {{ 'style=background:var(--fond)' if p.matricule == m else '' }}><td>{{ p.nom_complet }}{% if p.matricule in avec_compte %} <span class="badge encours" title="Compte de connexion créé">compte</span>{% endif %}</td><td>{{ p.fonction }}</td><td class="nb">{{ p.nb_classes }}</td><td class="nb">{{ p.nb_cours }}</td><td class="nb">{{ p.heures }}</td>
+        <td><a class="bouton {{ '' if p.matricule == m else 'second' }} petit" href="{{ url_for('etudes_sous_menu', sous='direction_etudes', f='enseignants', a=a, c=c, q=q, seuls='1' if seuls else None, m=p.matricule) }}">{{ 'Choisi' if p.matricule == m else 'Choisir' }}</a></td></tr>
+      {% else %}<tr><td colspan="6" class="sous">Aucun agent.</td></tr>{% endfor %}
+    </table></div>
+  </div>
+  <div>
+    <div class="carte">
+      <h2 style="margin:0 0 10px;font-size:1.1rem">{% if charge %}{{ charge.nom }} : {{ charge.nb_classes }} classe(s), {{ charge.nb_cours }} cours, {{ charge.heures }} h/sem.{% else %}Classes et cours du professeur{% endif %}</h2>
+      {% if charge %}
+      <form id="det" method="post" action="{{ url_for('gestion_enseignants_detacher') }}"><input type="hidden" name="a" value="{{ a }}"><input type="hidden" name="c" value="{{ c }}"><input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="m" value="{{ m }}">{% if seuls %}<input type="hidden" name="seuls" value="1">{% endif %}</form>
+      <div class="defile"><table class="tableau"><tr><th></th><th>Classe</th><th>Niveau</th><th>Cours</th><th class="nb">Heures</th></tr>
+      {% for l in charge.lignes %}<tr><td><input type="checkbox" form="det" name="ids" value="{{ l.id }}" aria-label="Choisir" style="width:auto"></td><td>{{ l.classe }}</td><td>{{ l.niveau }}</td><td>{{ l.cours }}</td><td class="nb">{{ l.heures }}</td></tr>
+      {% else %}<tr><td colspan="5" class="sous">Aucun cours attribué pour {{ a }}.</td></tr>{% endfor %}</table></div>
+      {% if charge.lignes and d.modif %}<div class="actions"><button class="second" type="submit" form="det" onclick="return confirm('Détacher les cours cochés de ce professeur ?')">Détacher les cours cochés</button></div>{% endif %}
+      {% else %}<p class="sous">Choisissez un agent dans la liste.</p>{% endif %}
+    </div>
+    <div class="carte espace">
+      <h2 style="margin:0 0 6px;font-size:1.1rem">Classe choisie en haut de la page</h2>
+      <p style="margin:0 0 10px">{% if titulaire %}<span class="badge encours">Titulaire {{ a }}</span> {{ titulaire.nom_complet }}{% else %}<span class="sous">Titulaire {{ a }} : aucun</span>{% endif %}</p>
+      <div class="ligne-actions">
+        {% for libelle, endpoint, droit, confirmation in (("Associer à cette classe", "gestion_enseignants_associer", d.ajout, ""), ("Désigner titulaire", "gestion_titulaire_designer", d.modif, "")) if droit and m %}
+        <form method="post" action="{{ url_for(endpoint) }}"><input type="hidden" name="a" value="{{ a }}"><input type="hidden" name="c" value="{{ c }}"><input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="m" value="{{ m }}">{% if seuls %}<input type="hidden" name="seuls" value="1">{% endif %}<button class="second" type="submit">{{ libelle }}</button></form>
+        {% endfor %}
+        {% if titulaire and d.modif %}<form method="post" action="{{ url_for('gestion_titulaire_retirer') }}" onsubmit="return confirm('Retirer le titulaire de cette classe ? Il ne pourra plus calculer les résultats ni imprimer les bulletins.')"><input type="hidden" name="a" value="{{ a }}"><input type="hidden" name="c" value="{{ c }}"><input type="hidden" name="q" value="{{ q }}">{% if m %}<input type="hidden" name="m" value="{{ m }}">{% endif %}<button class="danger" type="submit">Retirer le titulaire</button></form>{% endif %}
+      </div>
+      <p class="sous" style="margin:8px 0 0;font-size:.82rem">« Associer » attribue à l'agent choisi tous les cours de la classe qui n'ont pas encore de professeur.</p>
+    </div>
+    {% if admin and m and m not in avec_compte %}
+    <div class="carte espace">
+      <h2 style="margin:0 0 6px;font-size:1.1rem">Compte de connexion du professeur</h2>
+      <p class="sous" style="margin:0 0 10px">Crée l'identifiant et un mot de passe provisoire pour l'agent choisi (réservé à l'Administrateur). Le mot de passe n'est montré qu'une fois.</p>
+      <form method="post" action="{{ url_for('gestion_compte_professeur') }}" onsubmit="return confirm('Créer le compte de connexion de cet agent ?')"><input type="hidden" name="a" value="{{ a }}"><input type="hidden" name="c" value="{{ c }}"><input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="m" value="{{ m }}">{% if seuls %}<input type="hidden" name="seuls" value="1">{% endif %}<button type="submit">Créer le compte</button></form>
+    </div>{% endif %}
+  </div>
+</div>

@@ -1,0 +1,262 @@
+{% macro champs() %}<input type="hidden" name="annee" value="{{ h.annee }}"><input type="hidden" name="vue" value="{{ h.vue }}"><input type="hidden" name="classe" value="{{ h.classe }}"><input type="hidden" name="prof" value="{{ h.matricule }}">{% endmacro %}
+{% macro act(nom) %}{{ url_for('etudes_horaire_action', action=nom) }}{% endmacro %}
+<style>
+.sv{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px;border-bottom:1px solid var(--bord)}
+.sv a{padding:8px 14px;border-radius:8px 8px 0 0;font-size:.9rem;text-decoration:none;color:var(--gris)}
+.sv a.actif{background:var(--carte);color:var(--bleu);font-weight:600;border:1px solid var(--bord);border-bottom-color:var(--carte);margin-bottom:-1px}
+.sv .n{background:var(--rouge);color:#fff;border-radius:99px;font-size:.72rem;padding:0 7px;margin-left:4px}
+table.hor{border-collapse:collapse;width:100%;font-size:.85rem;table-layout:fixed;min-width:720px}
+table.hor th,table.hor td{border:1px solid var(--bord);padding:4px 6px;vertical-align:top}
+table.hor thead th{background:var(--fond);text-align:center}
+table.hor th.cr{width:96px;text-align:left;background:var(--fond);font-weight:600;white-space:nowrap}
+table.hor th.cr small{display:block;font-weight:normal;color:var(--gris)}
+table.hor tr.pause td{background:var(--fond);text-align:center;color:var(--gris);font-style:italic;padding:3px}
+table.hor td.cel{height:58px;position:relative}
+table.hor td.cel b{display:block;line-height:1.2;padding-right:14px}
+table.hor td.cel small{display:block;color:var(--gris)}
+table.hor td.cel.pris{background:#E7EEFC}
+table.hor td.cel.conflit{background:#FDECEA;outline:2px solid var(--rouge);outline-offset:-2px}
+table.hor td.cel.sur{outline:2px dashed var(--bleu);outline-offset:-2px}
+table.hor td.cel[draggable=true]{cursor:grab}
+table.hor td.cel form.x{position:absolute;top:1px;right:1px;margin:0}
+table.hor td.cel form.x button{background:transparent;color:var(--rouge);padding:0 5px;font-size:.9rem;border:0}
+table.hor td.cel select{width:100%;padding:3px;font-size:.78rem;margin-top:2px;max-width:100%}
+table.hor td.cel.vide select{border-style:dashed;color:var(--gris)}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) table.hor td.cel.pris{background:#17284F}:root:not([data-theme=light]) table.hor td.cel.conflit{background:#3A1614}}
+.badge.pub{background:#DDF3E3;color:#1E6B30}.badge.brou{background:#FDF0DC;color:#8A5300}.badge.non{background:var(--fond);color:var(--gris)}
+.barre-h{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px}
+.barre-h form{display:flex;gap:6px;align-items:center;margin:0}
+.barre-h select{width:auto;padding:7px 9px}
+button.sec{background:transparent;color:var(--bleu);border:1px solid var(--bleu)}
+button.danger{background:var(--rouge)}
+.defile{overflow-x:auto}
+.cfl{border-left:5px solid var(--rouge);margin:0 0 8px}
+form.heures{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:4px 12px}
+form.heures .plein-l{grid-column:1/-1}
+</style>
+
+{% if h.erreur %}<div class="erreur">{{ h.erreur }}</div>{% endif %}
+<form method="get" class="ligne" style="margin:0 0 12px">
+  <input type="hidden" name="f" value="horaire"><input type="hidden" name="vue" value="{{ h.vue }}">
+  {% if h.classe %}<input type="hidden" name="classe" value="{{ h.classe }}">{% endif %}{% if h.matricule %}<input type="hidden" name="prof" value="{{ h.matricule }}">{% endif %}
+  <label for="h-annee" style="margin:0">Année scolaire</label>
+  <select id="h-annee" name="annee" onchange="this.form.submit()" style="max-width:180px">
+    {% for a in h.annees %}<option value="{{ a }}" {{ 'selected' if a == h.annee else '' }}>{{ a }}</option>{% endfor %}
+  </select>
+  <noscript><button type="submit">Afficher</button></noscript>
+</form>
+<nav class="sv" aria-label="Élaboration horaire">
+  {% for v, lib in h.vues %}
+  <a href="{{ url_for('etudes_sous_menu', sous='direction_etudes', f='horaire', vue=v, annee=h.annee) }}" class="{{ 'actif' if v == h.vue else '' }}">{{ lib }}{% if v == 'conflits' and h.nb_conflits %}<span class="n">{{ h.nb_conflits }}</span>{% endif %}</a>
+  {% endfor %}
+  <a href="{{ url_for('etudes_horaires', annee=h.annee) }}" style="margin-left:auto">Consultation et impression</a>
+</nav>
+
+{# ============================================================ horaires des classes #}
+{% if h.vue == 'classes' and not h.grille %}
+<div class="carte">
+  {% if h.classes %}
+  <div class="defile"><table class="tableau">
+    <thead><tr><th>Classe</th><th>État</th><th>Vacation</th><th class="nb">Cours placés</th><th class="nb">Heures par semaine</th><th></th></tr></thead>
+    <tbody>
+    {% for k in h.classes %}
+    <tr>
+      <td><b>{{ k.designation }}</b>{% if k.option %}<br><span class="sous" style="font-size:.8rem">{{ k.option }}</span>{% endif %}</td>
+      <td><span class="badge {{ 'pub' if k.statut == 'PUBLIE' else ('brou' if k.existe else 'non') }}">{{ k.statut_libelle }}</span>{% if k.conflit %} <span class="badge impaye">Conflit</span>{% endif %}</td>
+      <td>{{ k.vacation or '—' }}</td>
+      <td class="nb">{{ k.nb_seances }}</td><td class="nb">{{ k.heures_requises }}</td>
+      <td><a class="lien" href="{{ url_for('etudes_sous_menu', sous='direction_etudes', f='horaire', vue='classes', annee=h.annee, classe=k.n_classe) }}">{{ 'Ouvrir' if k.existe else 'Créer l\'horaire' }}</a></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}<p class="sous" style="margin:0">Aucune classe du secondaire et humanitaire n'est enregistrée.</p>{% endif %}
+</div>
+{% if h.peut.MODIFICATION and h.classes %}
+<form method="post" action="{{ act('publier_tout') }}" style="margin-top:12px">{{ champs() }}<button type="submit" class="sec">Publier tous les horaires prêts</button>
+<span class="sous" style="font-size:.85rem"> Seuls les horaires sans conflit et dont chaque cours a un professeur sont publiés.</span></form>
+{% endif %}
+
+{# ============================================================ la grille d'une classe #}
+{% elif h.vue == 'classes' and h.grille %}
+{% set g = h.grille %}
+<p style="margin:0 0 6px"><a class="lien" href="{{ url_for('etudes_sous_menu', sous='direction_etudes', f='horaire', vue='classes', annee=h.annee) }}">&larr; Toutes les classes</a></p>
+<h3 class="sec" style="margin-top:0">{{ g.classe.designation }}{% if g.classe.option %} <span class="sous" style="font-size:.9rem">· {{ g.classe.option }}</span>{% endif %}
+  {% if g.horaire %}<span class="badge {{ 'pub' if g.horaire.publie else 'brou' }}">{{ 'Publié' if g.horaire.publie else 'Brouillon' }}</span>{% endif %}</h3>
+
+{% if not g.existe %}
+<div class="carte">
+  <p style="margin-top:0">Cette classe n'a pas encore d'horaire pour {{ g.annee }}.</p>
+  {% if h.peut.AJOUT %}
+  <form method="post" action="{{ act('creer') }}" class="ligne">{{ champs() }}
+    <label for="vac" style="margin:0">Vacation</label>
+    <select id="vac" name="vacation" style="max-width:200px">{% for v in g.vacations %}<option value="{{ v.cle }}">{{ v.libelle }}</option>{% endfor %}</select>
+    <button type="submit">Créer l'horaire</button>
+  </form>
+  {% else %}<p class="sous" style="margin:0">Le droit « Ajout » ne vous est pas accordé.</p>{% endif %}
+</div>
+{% else %}
+<div class="barre-h">
+  <a class="bouton sec" style="background:transparent;color:var(--bleu);border:1px solid var(--bleu)" target="_blank" rel="noopener" href="{{ url_for('etudes_horaire_classe', n_classe=g.classe.n_classe, annee=h.annee) }}">Imprimer</a>
+  {% if h.peut.MODIFICATION %}
+    {% if g.horaire.publie %}
+    <form method="post" action="{{ act('depublier') }}">{{ champs() }}<button type="submit" class="sec">Retirer de la publication</button></form>
+    {% else %}
+    <form method="post" action="{{ act('publier') }}">{{ champs() }}<button type="submit" {{ '' if g.peut_publier else 'disabled title="Publication impossible : horaire vide, conflit ou cours sans professeur"' }}>Publier</button></form>
+    {% endif %}
+    <form method="post" action="{{ act('vacation') }}">{{ champs() }}
+      <label for="vac2" style="margin:0">Vacation</label>
+      <select id="vac2" name="vacation">{% for v in g.vacations %}<option value="{{ v.cle }}" {{ 'selected' if v.cle == g.horaire.vacation else '' }}>{{ v.libelle }}</option>{% endfor %}</select>
+      <button type="submit" class="sec">Changer</button>
+    </form>
+  {% endif %}
+  {% if h.peut.SUPPRESSION and not g.horaire.publie %}
+    <form method="post" action="{{ act('supprimer') }}" onsubmit="return confirm('Supprimer tout l\'horaire de cette classe ?')">{{ champs() }}<button type="submit" class="danger">Supprimer l'horaire</button></form>
+  {% endif %}
+  {% if g.horaire.publie %}<span class="sous" style="font-size:.85rem">Publié le {{ g.horaire.date_pub }} par {{ g.horaire.publie_par }}. Les changements faits ici sont visibles tout de suite.</span>{% endif %}
+</div>
+
+{% for c in g.conflits %}<div class="erreur cfl">{{ c.message }}</div>{% endfor %}
+
+<div class="carte defile" style="padding:10px">
+  <table class="hor">
+    <thead><tr><th class="cr"></th>{% for j in g.jours %}<th>{{ j.nom }}</th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for cr in g.creneaux %}
+      {% if cr.type == 'COURS' %}
+      <tr><th class="cr">Cours {{ cr.ordre }}<small>{{ cr.debut }} – {{ cr.fin }}</small></th>
+        {% for j in g.jours %}{% set case = g.cases.get(j.index ~ '-' ~ cr.ordre) %}
+        <td class="cel {{ 'vide' if not case else 'pris' }} {{ 'conflit' if case and case.conflit else '' }}" data-jour="{{ j.index }}" data-ordre="{{ cr.ordre }}"
+            {% if case and h.peut.MODIFICATION %}draggable="true" data-seance="{{ case.id_seance }}"{% endif %}>
+          {% if case %}
+            <b>{{ case.cours }}</b><small>{{ case.professeur or 'Sans professeur' }}</small>
+            {% if h.peut.SUPPRESSION %}<form class="x" method="post" action="{{ act('retirer') }}">{{ champs() }}<input type="hidden" name="seance" value="{{ case.id_seance }}"><button type="submit" title="Retirer ce cours" aria-label="Retirer {{ case.cours }}">&#10005;</button></form>{% endif %}
+          {% endif %}
+          {% if (case and h.peut.MODIFICATION) or (not case and h.peut.AJOUT) %}
+            <form method="post" action="{{ act('placer') }}" style="margin:0">{{ champs() }}<input type="hidden" name="jour" value="{{ j.index }}"><input type="hidden" name="ordre" value="{{ cr.ordre }}">
+              <select name="id_cc" onchange="if(this.value)this.form.submit()" aria-label="{{ 'Remplacer le cours' if case else 'Placer un cours' }} : {{ j.nom }}, cours {{ cr.ordre }}">
+                <option value="">{{ 'Remplacer…' if case else '+ Placer un cours' }}</option>
+                {% for c in g.cours if c.actif and (not c.heures or c.reste > 0) and (not case or c.id_cc != case.id_cc) %}<option value="{{ c.id_cc }}">{{ c.cours }}{% if c.heures %} ({{ c.reste }} à placer){% endif %}</option>{% endfor %}
+              </select>
+            </form>
+          {% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+      {% else %}
+      <tr class="pause"><th class="cr">{{ cr.debut }} – {{ cr.fin }}</th><td colspan="{{ g.jours|length }}">{{ cr.libelle }}</td></tr>
+      {% endif %}
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if h.peut.MODIFICATION %}
+<form id="f-deplacer" method="post" action="{{ act('deplacer') }}" hidden>{{ champs() }}<input type="hidden" name="seance"><input type="hidden" name="jour"><input type="hidden" name="ordre"></form>
+<p class="sous" style="font-size:.85rem;margin:6px 0 0">Astuce : glissez un cours vers une autre case pour le déplacer ; si la case est occupée, les deux cours sont échangés. Un déplacement qui mettrait un professeur à deux endroits est refusé.</p>
+<script>
+(function () {
+  const f = document.getElementById("f-deplacer"); let src = null;
+  document.querySelectorAll("td.cel[draggable=true]").forEach(td => td.addEventListener("dragstart", e => { src = td.dataset.seance; e.dataTransfer.setData("text/plain", src); }));
+  document.querySelectorAll("td.cel").forEach(td => {
+    td.addEventListener("dragover", e => { if (src) { e.preventDefault(); td.classList.add("sur"); } });
+    td.addEventListener("dragleave", () => td.classList.remove("sur"));
+    td.addEventListener("drop", e => { e.preventDefault(); if (!src) return;
+      f.elements.seance.value = src; f.elements.jour.value = td.dataset.jour; f.elements.ordre.value = td.dataset.ordre; f.submit(); });
+  });
+})();
+</script>
+{% endif %}
+
+{% if g.alertes %}<h3 class="sec">À vérifier</h3><ul class="liste-alertes" style="list-style:none;padding:0;margin:0">{% for a in g.alertes %}<li class="alerte">{{ a }}</li>{% endfor %}</ul>{% endif %}
+
+<h3 class="sec">Cours de la classe et professeurs</h3>
+<div class="carte defile">
+  <table class="tableau">
+    <thead><tr><th>Cours</th><th class="nb">Heures par semaine</th><th class="nb">Placées</th><th>Professeur</th></tr></thead>
+    <tbody>
+    {% for c in g.cours %}
+    <tr>
+      <td>{{ c.cours }}{% if not c.actif %} <span class="badge non">Désactivé</span>{% endif %}</td>
+      <td class="nb">{{ c.heures }}</td><td class="nb">{{ c.places }}</td>
+      <td>
+        {% if h.peut.AJOUT and (h.peut.MODIFICATION or not c.matricule) %}
+        <form method="post" action="{{ act('professeur') }}">{{ champs() }}<input type="hidden" name="id_cc" value="{{ c.id_cc }}">
+          <select name="matricule" style="width:15rem" aria-label="Professeur de {{ c.cours }}">
+            <option value="">— aucun —</option>
+            {% for a in h.agents %}<option value="{{ a.matricule }}" {{ 'selected' if a.matricule == c.matricule else '' }}>{{ a.nom }}</option>{% endfor %}
+          </select>
+          <button type="submit" class="sec">Affecter</button>
+        </form>
+        {% else %}{{ c.professeur or '—' }}{% endif %}
+      </td>
+    </tr>
+    {% else %}<tr><td colspan="4" class="sous">Aucun cours n'est ouvert dans cette classe pour {{ g.annee }} (Direction des études > Programme des classes).</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{# ============================================================ heures, pauses et récréations #}
+{% elif h.vue == 'heures' and h.params %}
+<p class="sous" style="margin:0 0 10px">Par défaut : 7 cours de 45 minutes par jour — 5 cours, la pause, puis 2 cours. La vacation du matin commence à 7 h, celle de l'après-midi à 12 h. Le changement s'applique à toutes les classes de la vacation.</p>
+{% for v, p in h.params.items() %}
+<div class="carte" style="margin-bottom:14px">
+  <h3 class="sec" style="margin-top:0">Vacation du {{ p.libelle|lower }}</h3>
+  <div style="display:flex;flex-wrap:wrap;gap:20px">
+    <form class="heures" method="post" action="{{ act('heures') }}" style="flex:1 1 420px">{{ champs() }}<input type="hidden" name="vacation" value="{{ v }}">
+      <div><label for="d-{{ v }}">Début de la journée</label><input id="d-{{ v }}" name="debut" type="time" value="{{ p.debut }}" required></div>
+      <div><label>Durée d'un cours (min)</label><input name="duree_cours" type="number" min="20" max="120" value="{{ p.duree_cours }}" required></div>
+      <div><label>Cours avant la pause</label><input name="nb_avant" type="number" min="1" max="9" value="{{ p.nb_avant }}" required></div>
+      <div><label>Durée de la pause (min)</label><input name="duree_pause" type="number" min="5" max="90" value="{{ p.duree_pause }}" required></div>
+      <div><label>Cours après la pause</label><input name="nb_apres" type="number" min="0" max="9" value="{{ p.nb_apres }}" required></div>
+      <div><label>Récréation après le cours n° (0 : aucune)</label><input name="recreation_apres" type="number" min="0" max="9" value="{{ p.recreation_apres }}"></div>
+      <div><label>Durée de la récréation (min)</label><input name="duree_recreation" type="number" min="5" max="60" value="{{ p.duree_recreation }}"></div>
+      {% if h.peut.MODIFICATION %}<div class="plein-l" style="margin-top:8px"><button type="submit">Enregistrer</button></div>{% endif %}
+    </form>
+    <div style="flex:1 1 220px">
+      <b style="font-size:.9rem">{{ p.nb_cours }} cours par jour</b>
+      <table class="tableau" style="margin-top:6px"><tbody>
+      {% for cr in p.creneaux %}<tr class="{{ '' if cr.type == 'COURS' else 'groupe' }}"><td>{{ cr.libelle }}</td><td class="nb">{{ cr.debut }} – {{ cr.fin }}</td></tr>{% endfor %}
+      </tbody></table>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+{# ============================================================ horaires des professeurs #}
+{% elif h.vue == 'professeurs' %}
+<form method="get" class="ligne" style="margin:0 0 12px">
+  <input type="hidden" name="f" value="horaire"><input type="hidden" name="vue" value="professeurs"><input type="hidden" name="annee" value="{{ h.annee }}">
+  <label for="h-prof" style="margin:0">Professeur</label>
+  <select id="h-prof" name="prof" onchange="this.form.submit()" style="max-width:320px">
+    <option value="">— choisir —</option>
+    {% for p in h.profs %}<option value="{{ p.matricule }}" {{ 'selected' if p.matricule == h.matricule else '' }}>{{ p.nom }}</option>{% endfor %}
+  </select>
+  <noscript><button type="submit">Afficher</button></noscript>
+  {% if h.prof %}<a class="bouton sec" style="background:transparent;color:var(--bleu);border:1px solid var(--bleu)" target="_blank" rel="noopener" href="{{ url_for('etudes_horaire_professeur', matricule=h.prof.matricule, annee=h.annee) }}">Imprimer</a>{% endif %}
+</form>
+{% if h.prof %}
+{% set p = h.prof %}
+<div class="carte defile">
+  <b>{{ p.professeur }}</b> <span class="sous" style="font-size:.85rem">· {{ p.nb_seances }} cours par semaine{% if p.brouillon %} · contient des horaires non publiés{% endif %}</span>
+  {% include "_horaire_professeur_table.html" %}
+</div>
+{% elif not h.profs %}<div class="carte"><p class="sous" style="margin:0">Aucun professeur n'a de cours dans les classes du secondaire cette année.</p></div>{% endif %}
+
+{# ============================================================ conflits #}
+{% elif h.vue == 'conflits' and h.conflits %}
+<div class="carte">
+  {% if h.conflits.conflits %}
+    <p style="margin-top:0;color:var(--rouge);font-weight:600">{{ h.conflits.conflits|length }} conflit(s) d'horaire</p>
+    {% for c in h.conflits.conflits %}
+    <div class="erreur cfl">{{ c.message }}
+      <br>{% for s in c.seances %}<a class="lien" href="{{ url_for('etudes_sous_menu', sous='direction_etudes', f='horaire', vue='classes', annee=h.conflits.annee, classe=s.n_classe) }}">Ouvrir {{ s.classe }}</a>{{ ' · ' if not loop.last }}{% endfor %}</div>
+    {% endfor %}
+  {% else %}<p style="margin:0;color:var(--vert);font-weight:600">Aucun conflit : aucun professeur n'est attendu à deux endroits en même temps.</p>{% endif %}
+  {% if h.conflits.sans_professeur %}
+    <h3 class="sec">Cours placés sans professeur</h3>
+    <ul>{% for x in h.conflits.sans_professeur %}<li>{{ x.classe }} : {{ x.cours }} ({{ x.jour_nom }}, {{ x.debut }})</li>{% endfor %}</ul>
+  {% endif %}
+</div>
+{% endif %}

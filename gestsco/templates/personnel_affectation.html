@@ -1,0 +1,69 @@
+{% extends "personnel_base.html" %}
+{% macro champs(v, f_courante=None, s_courant=None) %}
+<div class="grille-form">
+  <div><label class="obligatoire">Fonction</label>
+    <select name="id_fonction" required><option value="">—</option>
+      {% for f in fonctions if f.actif or f.id == f_courante %}<option value="{{ f.id }}" {{ 'selected' if v.id_fonction|string == f.id|string }}>{{ f.libelle }}{{ '' if f.actif else ' (désactivée)' }}</option>{% endfor %}</select></div>
+  <div><label>Service (facultatif)</label>
+    <select name="id_service"><option value="">—</option>
+      {% for x in services if x.actif or x.id == s_courant %}<option value="{{ x.id }}" {{ 'selected' if v.id_service|string == x.id|string }}>{{ x.libelle }}{{ '' if x.actif else ' (désactivé)' }}</option>{% endfor %}</select></div>
+  <div><label>Responsabilité (facultative)</label><input name="responsabilite" value="{{ v.responsabilite or '' }}" maxlength="100" placeholder="ex. Titulaire de la 3ème A"></div>
+  <div><label class="obligatoire">Début</label><input name="date_debut" type="date" value="{{ v.date_debut or '' }}" required></div>
+  <div><label>Fin (facultative)</label><input name="date_fin" type="date" value="{{ v.date_fin or '' }}"></div>
+  <div><label>Motif (facultatif)</label><input name="motif" value="{{ v.motif or '' }}" maxlength="200" placeholder="ex. Promotion"></div>
+</div>
+{% endmacro %}
+{% block contenu %}
+{% set action = '/m/personnel/affectation' %}
+{% include "_personnel_choix_agent.html" %}
+{% if agent %}
+<div class="carte espace">
+  <h2 style="margin:0;font-size:1.15rem">{{ agent.nom_complet }}{% if not agent.actif %} <span class="badge inactif">Désactivé</span>{% endif %}</h2>
+  <span class="sous" style="margin:0">Matricule {{ agent.matricule }} · engagé le {{ agent.date_engagement }}</span>
+  <p style="margin:10px 0 0"><b>Situation actuelle :</b>
+    {% if actuelle %}{{ actuelle.fonction }}{% if actuelle.service %} · service {{ actuelle.service }}{% endif %}{% if actuelle.responsabilite %} · {{ actuelle.responsabilite }}{% endif %} (depuis le {{ actuelle.date_debut }})
+    {% else %}aucune affectation en cours.{% endif %}</p>
+</div>
+
+{% if d.ajout and agent.actif %}
+<form class="carte espace" method="post" action="/m/personnel/affectation/affecter">
+  <input type="hidden" name="m" value="{{ agent.matricule }}">
+  <h2 style="margin:0 0 6px;font-size:1.05rem">Nouvelle affectation</h2>
+  <p class="sous" style="margin-bottom:4px;font-size:.88rem">Un changement de fonction s'enregistre ici : l'affectation en cours, si elle n'a pas de date de fin, se termine la veille du nouveau début.</p>
+  {{ champs(saisie if id_en_erreur == 0 else {'date_debut': aujourdhui}) }}
+  <div class="actions"><button type="submit">Enregistrer l'affectation</button></div>
+</form>
+{% elif d.ajout %}<p class="alerte espace">Ce dossier est désactivé : réactivez-le (onglet « Dossier de l'agent ») avant d'affecter l'agent.</p>{% endif %}
+
+<div class="carte espace">
+  <h2 style="margin:0 0 10px;font-size:1.05rem">Historique des affectations</h2>
+  {% if histo %}
+  <div class="defile"><table class="tableau">
+    <tr><th>Fonction</th><th>Service</th><th>Responsabilité</th><th>Du</th><th>Au</th><th>Durée</th><th>État</th><th>Motif</th><th></th></tr>
+    {% for a in histo %}
+    <tr>
+      <td>{{ a.fonction }}</td><td>{{ a.service or '—' }}</td><td>{{ a.responsabilite or '—' }}</td><td>{{ a.date_debut }}</td><td>{{ a.date_fin or 'sans fin' }}</td>
+      <td>{{ a.duree }}</td>
+      <td><span class="badge {{ {'EN_COURS':'encours','TERMINEE':'inactif','A_VENIR':'avenir'}[a.statut] }}">{{ a.libelle_statut }}</span></td>
+      <td>{{ a.motif }}</td>
+      <td>{% if d.modif %}<details class="corriger" {{ 'open' if id_en_erreur == a.id_aff }}><summary>Corriger</summary>
+        <div class="carte">
+          <form method="post" action="/m/personnel/affectation/corriger">
+            <input type="hidden" name="m" value="{{ agent.matricule }}"><input type="hidden" name="id_aff" value="{{ a.id_aff }}">
+            {{ champs(saisie if id_en_erreur == a.id_aff else {'id_fonction': a.id_fonction, 'id_service': a.id_service or '', 'responsabilite': a.responsabilite, 'date_debut': a.date_debut|en_iso, 'date_fin': a.date_fin|en_iso, 'motif': a.motif}, a.id_fonction, a.id_service) }}
+            <div class="actions" style="margin-top:10px"><button type="submit" class="petit">Enregistrer la correction</button></div>
+          </form>
+          {% if not a.date_fin %}
+          <form method="post" action="/m/personnel/affectation/terminer" class="espace">
+            <input type="hidden" name="m" value="{{ agent.matricule }}"><input type="hidden" name="id_aff" value="{{ a.id_aff }}">
+            <div class="grille-form"><div><label class="obligatoire">Date de fin</label><input name="date_fin" type="date" required></div>
+              <div><label>Motif (facultatif)</label><input name="motif" maxlength="200"></div></div>
+            <div class="actions" style="margin-top:10px"><button type="submit" class="second petit">Terminer cette affectation</button></div>
+          </form>{% endif %}
+        </div></details>{% endif %}</td>
+    </tr>{% endfor %}
+  </table></div>
+  {% else %}<p class="sous" style="margin:0">Aucune affectation.</p>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

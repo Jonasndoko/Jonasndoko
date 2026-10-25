@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block titre %}{{ titre }}{% endblock %}
+{% block entete %}
+{% if menu_utile %}<a class="bouton clair" href="/">Menu</a>{% endif %}
+<span style="font-size:.85rem">{{ s.nom_complet }} · {{ s.libelle_role }}</span>
+<form method="post" action="/deconnexion"><button class="clair" type="submit">Déconnexion</button></form>
+{% endblock %}
+{% block corps %}
+<p style="margin:0 0 6px"><a class="lien" href="{{ url_for('etudes_accueil') }}">&larr; Retour à mon espace</a></p>
+<h1 style="margin-top:0">Horaires</h1>
+<p class="sous" style="margin:0 0 12px">{{ 'Tous les horaires, publiés ou non.' if complet else 'Horaires publiés par la Direction des études (consultation seule).' }}</p>
+<form method="get" class="ligne" style="margin:0 0 14px">
+  <label for="annee" style="margin:0">Année scolaire</label>
+  <select id="annee" name="annee" onchange="this.form.submit()" style="max-width:180px">
+    {% for a in annees %}<option value="{{ a }}" {{ 'selected' if a == annee else '' }}>{{ a }}</option>{% endfor %}
+  </select>
+  <noscript><button type="submit">Afficher</button></noscript>
+</form>
+<div style="display:flex;flex-wrap:wrap;gap:16px">
+  <div class="carte" style="flex:1 1 300px">
+    <h2 style="margin:0 0 8px;font-size:1.1rem">Par classe</h2>
+    {% for k in classes if k.existe %}
+    <div style="padding:6px 0;border-top:1px solid var(--bord)"><a class="lien" href="{{ url_for('etudes_horaire_classe', n_classe=k.n_classe, annee=annee) }}">{{ k.designation }}{% if k.option %} · {{ k.option }}{% endif %}</a>
+      <span class="sous" style="font-size:.8rem">· {{ k.vacation }}{% if complet %} · {{ k.statut_libelle }}{% endif %}</span></div>
+    {% else %}<p class="sous" style="margin:0">Aucun horaire {{ '' if complet else 'publié ' }}pour {{ annee }}.</p>{% endfor %}
+  </div>
+  <div class="carte" style="flex:1 1 300px">
+    <h2 style="margin:0 0 8px;font-size:1.1rem">Par professeur</h2>
+    {% for p in profs %}
+    <div style="padding:6px 0;border-top:1px solid var(--bord)"><a class="lien" href="{{ url_for('etudes_horaire_professeur', matricule=p.matricule, annee=annee) }}">{{ p.nom }}</a></div>
+    {% else %}<p class="sous" style="margin:0">Aucun professeur à afficher.</p>{% endfor %}
+  </div>
+</div>
+{% endblock %}

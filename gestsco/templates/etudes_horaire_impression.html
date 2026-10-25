@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Horaire {{ g.classe.designation if g else p.professeur }} · {{ cfg.NOM_ECOLE }}</title>
+<style>
+@page{size:A4 landscape;margin:12mm}
+*{box-sizing:border-box}
+body{margin:0;padding:16px;font-family:"Segoe UI",system-ui,sans-serif;color:#16213E;background:#fff}
+.tete{display:flex;align-items:center;gap:14px;border-bottom:3px solid #0C1B3F;padding-bottom:8px;margin-bottom:12px}
+.tete img{height:56px}
+.tete h1{font-family:Georgia,serif;font-size:1.3rem;margin:0}
+.tete p{margin:2px 0 0;color:#5A6785;font-size:.9rem}
+.actions{margin:0 0 12px;display:flex;gap:8px}
+.actions button,.actions a{background:#1D4ED8;color:#fff;border:0;border-radius:8px;padding:8px 16px;font:inherit;cursor:pointer;text-decoration:none}
+.actions a{background:transparent;color:#1D4ED8;border:1px solid #1D4ED8}
+table{border-collapse:collapse;width:100%;font-size:.85rem;table-layout:fixed}
+th,td{border:1px solid #8A97B5;padding:4px 6px;vertical-align:top}
+thead th{background:#E7EAF3}
+th.cr{width:100px;text-align:left;background:#F1F3F9;white-space:nowrap}
+th.cr small{display:block;font-weight:normal;color:#5A6785}
+tr.pause td{background:#F1F3F9;text-align:center;font-style:italic;color:#5A6785;padding:2px}
+td.cel{height:54px}
+td.cel b{display:block;line-height:1.2}
+td.cel small{display:block;color:#5A6785}
+td.cf{background:#FDECEA}
+.pied{margin-top:10px;font-size:.78rem;color:#5A6785;display:flex;justify-content:space-between}
+@media print{.actions{display:none}body{padding:0}}
+</style>
+</head>
+<body>
+<div class="actions"><button onclick="window.print()">Imprimer</button><a href="javascript:window.close()">Fermer</a></div>
+<div class="tete">
+  <img src="/assets/logo_96.png" alt="">
+  <div>
+    <h1>{{ cfg.NOM_ECOLE }}</h1>
+    {% if g %}<p><b>Horaire de la classe {{ g.classe.designation }}{% if g.classe.option %} · {{ g.classe.option }}{% endif %}</b> · Année scolaire {{ g.annee }} · Vacation du {{ g.horaire.vacation_libelle|lower }}{% if not g.horaire.publie %} · <b>BROUILLON</b>{% endif %}</p>
+    {% else %}<p><b>Horaire de {{ p.professeur }}</b> · Année scolaire {{ p.annee }}{% if p.brouillon %} · <b>contient des horaires non publiés</b>{% endif %}</p>{% endif %}
+  </div>
+</div>
+{% if g %}
+<table>
+  <thead><tr><th class="cr"></th>{% for j in g.jours %}<th>{{ j.nom }}</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for cr in g.creneaux %}
+    {% if cr.type == 'COURS' %}
+    <tr><th class="cr">Cours {{ cr.ordre }}<small>{{ cr.debut }} – {{ cr.fin }}</small></th>
+      {% for j in g.jours %}{% set case = g.cases.get(j.index ~ '-' ~ cr.ordre) %}
+      <td class="cel {{ 'cf' if case and case.conflit else '' }}">{% if case %}<b>{{ case.cours }}</b><small>{{ case.professeur }}</small>{% endif %}</td>
+      {% endfor %}
+    </tr>
+    {% else %}<tr class="pause"><th class="cr">{{ cr.debut }} – {{ cr.fin }}</th><td colspan="{{ g.jours|length }}">{{ cr.libelle }}</td></tr>{% endif %}
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+{% include "_horaire_professeur_table.html" %}
+{% endif %}
+<div class="pied"><span>Imprimé le {{ aujourdhui }}</span><span>GESTSCO</span></div>
+</body>
+</html>

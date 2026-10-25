@@ -1,0 +1,47 @@
+{% extends "personnel_base.html" %}
+{% block contenu %}
+{% set action = '/m/personnel/autorisations' %}
+{% include "_personnel_choix_agent.html" %}
+{% if agent %}
+<div class="carte espace">
+  <h2 style="margin:0;font-size:1.15rem">{{ agent.nom_complet }}{% if not agent.actif %} <span class="badge inactif">Désactivé</span>{% endif %}</h2>
+  <span class="sous" style="margin:0">Matricule {{ agent.matricule }} · {{ agent.fonction }}</span>
+  <p style="margin:10px 0 0">Jours de travail pris en {{ suivi.annee }} : <b>{{ suivi.jours_annee.PERMISSION }}</b> en permission, <b>{{ suivi.jours_annee.CONGE }}</b> en congé.</p>
+</div>
+
+{% if d.ajout and agent.actif %}
+<form class="carte espace" method="post" action="/m/personnel/autorisations/accorder">
+  <input type="hidden" name="m" value="{{ agent.matricule }}">
+  <h2 style="margin:0 0 6px;font-size:1.05rem">Accorder une permission ou un congé</h2>
+  <p class="sous" style="font-size:.88rem;margin-bottom:4px">Les jours couverts ne sont jamais des absences. Des absences déjà marquées sur la période sont régularisées ; des jours marqués présent ou en retard bloquent l'enregistrement.</p>
+  <div class="grille-form">
+    <div><label class="obligatoire">Type</label><select name="type" required>{% for cle, lib in types.items() %}<option value="{{ cle }}" {{ 'selected' if saisie.type == cle }}>{{ lib }}</option>{% endfor %}</select></div>
+    <div><label>Nature</label><input name="nature" list="natures" value="{{ saisie.nature or '' }}" maxlength="60" placeholder="ex. Raison de santé"><datalist id="natures">{% for n in natures %}<option value="{{ n }}">{% endfor %}</datalist></div>
+    <div><label class="obligatoire">Du</label><input type="date" name="debut" value="{{ saisie.debut or aujourdhui }}" required></div>
+    <div><label class="obligatoire">Au (inclus)</label><input type="date" name="fin" value="{{ saisie.fin or aujourdhui }}" required></div>
+    <div class="large"><label>Motif (facultatif)</label><input name="motif" value="{{ saisie.motif or '' }}" maxlength="200"></div>
+  </div>
+  <div class="actions"><button type="submit">Enregistrer</button></div>
+</form>
+{% elif d.ajout %}<p class="alerte espace">Ce dossier est désactivé : réactivez-le avant d'accorder une autorisation.</p>{% endif %}
+
+<div class="carte espace">
+  <h2 style="margin:0 0 10px;font-size:1.05rem">Permissions et congés de l'agent</h2>
+  {% if suivi.autorisations %}
+  <div class="defile"><table class="tableau">
+    <tr><th>Type</th><th>Nature</th><th>Du</th><th>Au</th><th class="nb">Jours</th><th>État</th><th>Motif</th><th></th></tr>
+    {% for a in suivi.autorisations %}
+    <tr><td>{{ a.libelle_type }}</td><td>{{ a.nature }}</td><td>{{ a.debut }}</td><td>{{ a.fin }}</td><td class="nb">{{ a.jours }}</td>
+      <td><span class="badge {{ 'encours' if a.statut == 'ACCORDE' else 'inactif' }}">{{ a.libelle_statut }}</span></td>
+      <td>{{ a.motif }}{% if a.motif_annulation %}<br><span class="sous" style="margin:0;font-size:.8rem">Annulation : {{ a.motif_annulation }}</span>{% endif %}</td>
+      <td>{% if d.modif and a.statut == 'ACCORDE' %}<details class="corriger"><summary>Annuler</summary>
+        <form method="post" action="/m/personnel/autorisations/annuler" class="carte" style="margin-top:8px">
+          <input type="hidden" name="m" value="{{ agent.matricule }}"><input type="hidden" name="id_aut" value="{{ a.id }}">
+          <label class="obligatoire">Motif de l'annulation</label><input name="motif" maxlength="200" required>
+          <div class="actions" style="margin-top:10px"><button type="submit" class="danger petit">Annuler cette autorisation</button></div></form></details>{% endif %}</td></tr>
+    {% endfor %}
+  </table></div>
+  {% else %}<p class="sous" style="margin:0">Aucune permission ni congé enregistré.</p>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

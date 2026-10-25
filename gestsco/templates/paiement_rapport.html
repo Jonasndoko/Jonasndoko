@@ -1,0 +1,38 @@
+{% extends "paiement_base.html" %}
+{% block contenu %}
+<form class="carte" method="get" action="/m/paiement/rapport">
+  <div class="ligne">
+    <div style="flex:1;min-width:160px"><label for="date">Date (jj/mm/aaaa)</label><input id="date" name="date" value="{{ texte_date }}" placeholder="08/10/2026"></div>
+    {% if not est_percepteur %}
+    <div style="flex:1;min-width:200px"><label for="perc">Percepteur</label><select id="perc" name="perc">
+      <option value="">Tous les percepteurs</option>
+      {% for n, nom in percepteurs %}<option value="{{ n }}" {{ 'selected' if n == n_perc else '' }}>N° {{ n }} - {{ nom }}</option>{% endfor %}</select></div>
+    {% endif %}
+    <div style="align-self:end"><button type="submit">Afficher</button></div>
+  </div>
+</form>
+{% if erreur %}<div class="erreur espace" role="alert">{{ erreur }}</div>{% endif %}
+{% if rapport %}
+  {% if not rapport.nb_recus %}
+  <div class="alerte espace">Aucun paiement encaissé le {{ rapport.date_txt }}.{% if rapport.nb_annules %} ({{ rapport.nb_annules }} reçu(s) annulé(s) non comptés.){% endif %}</div>
+  {% else %}
+  <div class="carte espace">
+    <p class="sous" style="margin-bottom:10px">{{ rapport.etiquette }} · {{ rapport.nb_recus }} reçu(s) le {{ rapport.date_txt }}{% if rapport.nb_annules %} · {{ rapport.nb_annules }} reçu(s) annulé(s) non comptés{% endif %}</p>
+    <div class="defile"><table class="tableau">
+      <tr><th>N°</th><th>Reçu</th><th>Nom complet</th><th>Classe</th><th>Option</th><th class="nb">Montant</th></tr>
+      {% for g in rapport.groupes %}
+      <tr class="groupe"><td colspan="6">TYPE DE FRAIS : {{ g.type_frais|upper }}</td></tr>
+      {% for l in g.lignes %}
+      <tr><td>{{ loop.index }}</td><td>{{ l.n_recu }}</td><td>{{ l.nom_complet }}</td><td>{{ l.classe }}</td><td>{{ l.option or "-" }}</td><td class="nb">{{ l.montant_txt }}</td></tr>
+      {% endfor %}
+      <tr class="total"><td colspan="5">Total {{ g.type_frais }} ({{ g.lignes|length }} reçu(s))</td>
+        <td class="nb">{% for dev, c in g.totaux|dictsort %}{{ c|montant }} {{ dev }}{{ " ; " if not loop.last }}{% endfor %}</td></tr>
+      {% endfor %}
+    </table></div>
+    <p style="font-weight:700;margin:14px 0 0">TOTAL GÉNÉRAL DE LA JOURNÉE : {% for dev, c in rapport.totaux %}{{ c|montant }} {{ dev }}{{ " ; " if not loop.last }}{% endfor %}</p>
+    <div class="actions"><a class="bouton" target="_blank" rel="noopener"
+      href="{{ url_for('paiement_rapport_pdf', date=texte_date, perc=n_perc) }}">Imprimer le rapport (PDF)</a></div>
+  </div>
+  {% endif %}
+{% endif %}
+{% endblock %}

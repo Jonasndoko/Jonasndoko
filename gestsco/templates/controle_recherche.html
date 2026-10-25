@@ -1,0 +1,23 @@
+{% extends "controle_base.html" %}
+{% block contenu %}
+<form class="carte" method="get" action="/m/controle/eleve">
+  <p class="sous" style="margin-bottom:6px">Saisissez le nom ou le matricule de l'élève.</p>
+  <label for="q">Nom ou matricule de l'élève</label>
+  <div class="ligne">
+    <input id="q" name="q" value="{{ q }}" autofocus autocomplete="off">
+    <button type="submit">Contrôler</button>
+  </div>
+  {% if message %}<div class="alerte espace" role="alert">{{ message }}</div>{% endif %}
+</form>
+{% if resultats %}
+<div class="carte espace">
+  <p class="sous" style="margin-bottom:8px">{{ resultats|length }} élèves trouvés : choisissez le bon élève.{% if resultats|length >= 60 %} Affinez la recherche si besoin.{% endif %}</p>
+  <div class="defile"><table class="tableau">
+    <tr><th>Matricule</th><th>Nom complet</th><th>Classe (année en cours)</th></tr>
+    {% for r in resultats %}
+    <tr><td><a class="lien" href="{{ url_for('controle_eleve', matricule=r.matricule) }}">{{ r.matricule }}</a></td><td>{{ r.nom_complet }}</td><td>{{ r.classe }}</td></tr>
+    {% endfor %}
+  </table></div>
+</div>
+{% endif %}
+{% endblock %}

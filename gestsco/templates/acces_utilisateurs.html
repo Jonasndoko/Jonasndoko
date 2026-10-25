@@ -1,0 +1,47 @@
+{% extends "acces_base.html" %}
+{% block contenu %}
+<p class="sous">Créez les comptes et attribuez à chacun un rôle. Le mot de passe provisoire n'est affiché qu'une seule fois ; l'utilisateur devra le changer à sa première connexion.</p>
+{% if cible %}
+<div class="carte" style="max-width:620px;margin-bottom:14px">
+  <h2 style="margin:0 0 4px;font-size:1.1rem">Modifier le compte de {{ cible.nom }}</h2>
+  <p class="sous" style="margin:0">Identifiant : {{ cible.login }} (ne se modifie pas). Changer le rôle remet les droits du compte aux droits de base du nouveau rôle.</p>
+  <form method="post" action="{{ url_for('acces_modifier') }}">
+    <input type="hidden" name="id" value="{{ cible.id }}">
+    <label for="m-nom" class="obligatoire">Nom complet</label><input id="m-nom" name="nom" value="{{ cible.nom }}" maxlength="80" required>
+    <label for="m-poste" class="obligatoire">Rôle</label>
+    <select id="m-poste" name="poste" required>{% for code, lib in roles.items() %}<option value="{{ code }}" {{ 'selected' if code == cible.role else '' }}>{{ lib }}</option>{% endfor %}</select>
+    <label class="case-ligne"><input type="checkbox" name="actif" value="1" {{ 'checked' if cible.actif else '' }}> Compte actif</label>
+    <div class="actions"><button type="submit">Enregistrer</button><a class="bouton second" href="{{ url_for('acces_utilisateurs') }}">Annuler</a></div>
+  </form>
+</div>
+{% endif %}
+<div class="carte"><div class="defile"><table class="tableau">
+  <tr><th>Nom complet</th><th>Identifiant</th><th>Rôle</th><th>État</th><th>Dernière connexion</th><th>Actions</th></tr>
+  {% for c in comptes %}
+  <tr class="{{ 'inactif' if not c.actif else '' }} {{ 'choisi' if cible and cible.id == c.id else '' }}">
+    <td>{{ c.nom }}</td><td>{{ c.login }}</td><td>{{ c.poste }}</td>
+    <td><span class="badge {{ c.classe }}">{{ c.etat }}</span></td>
+    <td>{{ c.derniere|horo if c.derniere else 'jamais' }}</td>
+    <td style="white-space:nowrap">
+      <a class="bouton second petit" href="{{ url_for('acces_utilisateurs', modifier=c.id) }}">Modifier</a>
+      <form method="post" action="{{ url_for('acces_mdp') }}" onsubmit="return confirm('Donner un nouveau mot de passe provisoire à {{ c.nom|replace("'", "’") }} ?\nL\'ancien mot de passe cessera de fonctionner.')"><input type="hidden" name="id" value="{{ c.id }}"><button class="second petit" type="submit">Nouveau mot de passe</button></form>
+      <form method="post" action="{{ url_for('acces_debloquer') }}"><input type="hidden" name="id" value="{{ c.id }}"><button class="second petit" type="submit">Débloquer</button></form>
+      {% if c.actif and not c.soi %}<form method="post" action="{{ url_for('acces_etat') }}" onsubmit="return confirm('Désactiver le compte de {{ c.nom|replace("'", "’") }} ?\nIl ne pourra plus se connecter. Son historique est conservé et vous pourrez le réactiver.')"><input type="hidden" name="id" value="{{ c.id }}"><input type="hidden" name="actif" value="0"><button class="danger petit" type="submit">Désactiver</button></form>
+      {% elif not c.actif %}<form method="post" action="{{ url_for('acces_etat') }}"><input type="hidden" name="id" value="{{ c.id }}"><input type="hidden" name="actif" value="1"><button class="second petit" type="submit">Activer</button></form>{% endif %}
+    </td>
+  </tr>{% endfor %}
+</table></div></div>
+<div class="carte espace">
+  <h2 style="margin:0 0 8px;font-size:1.1rem">Nouvel utilisateur</h2>
+  <form method="post" action="{{ url_for('acces_nouveau') }}">
+    <div class="grille-form">
+      <div><label for="n-nom" class="obligatoire">Nom complet</label><input id="n-nom" name="nom" value="{{ saisie.nom }}" maxlength="80" required autocomplete="off"></div>
+      <div><label for="n-login" class="obligatoire">Identifiant</label><input id="n-login" name="login" value="{{ saisie.login }}" maxlength="32" required autocomplete="off" autocapitalize="none"></div>
+      <div><label for="n-poste" class="obligatoire">Rôle</label>
+        <select id="n-poste" name="poste" required><option value="">— choisir —</option>{% for code, lib in roles.items() %}<option value="{{ code }}" {{ 'selected' if code == saisie.poste else '' }}>{{ lib }}</option>{% endfor %}</select></div>
+    </div>
+    <div class="actions"><button type="submit">Créer le compte</button></div>
+    <p class="note">Identifiant : 3 à 32 caractères (lettres, chiffres, point, tiret, _). Le compte reçoit les droits de base de son rôle ; ajustez-les dans l'onglet Autorisations.</p>
+  </form>
+</div>
+{% endblock %}

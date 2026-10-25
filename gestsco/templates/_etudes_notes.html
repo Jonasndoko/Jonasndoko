@@ -1,0 +1,307 @@
+{# Contrôle des notes : consultation, notes manquantes, demandes de correction (controle_notes.py). La direction ne modifie jamais un point. #}
+<style>
+.n-pastille{display:inline-block;border-radius:99px;padding:1px 9px;font-size:.78rem;font-weight:600;white-space:nowrap}
+.e-COMPLET{background:#DDF3E3;color:#1E6B30}.e-INCOMPLET{background:#FDF0DC;color:#8A5300}.e-NON_SAISI{background:#FDECEA;color:var(--rouge)}
+.e-SANS_PROF{background:#EADFF8;color:#4B2A8A}.e-SANS_OBJET,.e-A_VENIR{background:var(--fond);color:var(--gris)}
+.s-OUVERTE{background:#FDF0DC;color:#8A5300}.s-TRAITEE{background:#DDF3E3;color:#1E6B30}.s-ANNULEE{background:var(--fond);color:var(--gris)}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .e-COMPLET,:root:not([data-theme=light]) .s-TRAITEE{background:#12301B;color:#9BE3B0}:root:not([data-theme=light]) .e-INCOMPLET,:root:not([data-theme=light]) .s-OUVERTE{background:#3A2A0B;color:#FFD9A0}:root:not([data-theme=light]) .e-NON_SAISI{background:#3A1614;color:#FFB4AB}:root:not([data-theme=light]) .e-SANS_PROF{background:#2A1D4A;color:#D6C2FF}}
+.n-pills{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+.n-pills a{padding:5px 12px;border:1px solid var(--bord);border-radius:99px;text-decoration:none;color:var(--bleu);background:var(--carte);font-size:.88rem}
+.n-pills a.actif{background:var(--bleu);color:#fff;border-color:var(--bleu)}
+.n-filtre{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:end;margin:0 0 12px}
+.n-filtre>div{display:flex;flex-direction:column;gap:2px}.n-filtre label{margin:0;font-size:.8rem;color:var(--gris)}
+.n-filtre select{width:auto;padding:7px 9px}
+.n-chiffres{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:0 0 14px}
+.n-chiffre{background:var(--carte);border:1px solid var(--bord);border-radius:10px;padding:10px 14px}
+.n-chiffre b{display:block;font-size:1.35rem;line-height:1.2}.n-chiffre span{font-size:.78rem;color:var(--gris)}
+.n-chiffre.rouge b{color:var(--rouge)}.n-chiffre.vert b{color:var(--vert)}
+.n-defile{overflow-x:auto}
+.n-barre{height:7px;border-radius:4px;background:var(--bord);overflow:hidden;min-width:70px}.n-barre i{display:block;height:100%;background:var(--vert)}
+.n-sec{margin:18px 0 6px;font-size:1.02rem}
+.n-note{font-size:.85rem;color:var(--gris);margin:0 0 8px}
+.n-bloc{border:1px solid var(--bord);border-radius:10px;padding:10px 14px;margin:0 0 10px;background:var(--carte)}
+.n-bloc .tete{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;justify-content:space-between}
+.n-reponse{margin:6px 0 0;padding:6px 10px;border-left:3px solid var(--bleu);background:var(--fond);font-size:.9rem;white-space:pre-line}
+.n-manque{color:var(--rouge);font-weight:600}
+td.pt,th.pt{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.v-carte{border:1px solid var(--bord);border-radius:10px;padding:8px 12px;margin:0 0 12px;background:var(--carte)}
+.v-carte .tete{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;justify-content:space-between;margin:0 0 4px}
+.c-OK b{font-weight:600}.c-MANQUANT{color:var(--rouge);font-weight:600}.c-PARTIEL{color:#8A5300}.c-SANS_OBJET,.c-A_VENIR{color:var(--gris)}
+.v-total td,.v-total th{border-top:2px solid var(--bord);font-weight:600}
+.v-sem{background:var(--fond)}
+.n-filtre input[type=search]{width:auto;min-width:190px;padding:7px 9px}
+</style>
+{% set N = n %}
+{% macro champs(extra=none) %}
+  {% for k in ('vue','annee','cle','cc','classe','prof','statut') %}{% if N[k] %}<input type="hidden" name="{{ k }}" value="{{ N[k] }}">{% endif %}{% endfor %}
+  {% if N.en_cours %}<input type="hidden" name="en_cours" value="1">{% endif %}
+{% endmacro %}
+
+{% if N.erreur %}<div class="erreur">{{ N.erreur }}</div>{% endif %}
+
+{% if not N.fiche %}
+<nav class="n-pills" aria-label="Vues du contrôle des notes">
+  {% for cle, lib in N.vues %}<a href="{{ url_for('etudes_sous_menu', sous='direction_etudes', f='notes', vue=cle, annee=N.annee or none) }}" class="{{ 'actif' if cle == N.vue else '' }}" {% if cle == N.vue %}aria-current="page"{% endif %}>{{ lib }}</a>{% endfor %}
+</nav>
+{% endif %}
+
+{# ============================================================ fiche d'un cours : les notes saisies #}
+{% if N.fiche %}
+{% set F = N.fiche %}{% set E = F.etat %}
+<p style="margin:0 0 6px"><a class="lien" href="{{ url_for('etudes_sous_menu', sous='direction_etudes', f='notes', vue='synthese', annee=F.annee, cle=F.cle) }}">&larr; Situation par période</a></p>
+<h3 class="n-sec" style="margin-top:4px">{{ F.cours }} · {{ F.classe }} <span class="sous" style="font-size:.85rem;font-weight:normal">· {{ F.periode }} · sur {{ F.maximum }}</span></h3>
+<p class="n-note">
+  Professeur : <b>{{ F.professeur or 'aucun attribué' }}</b> ·
+  <span class="n-pastille e-{{ E.etat }}">{{ E.etat_libelle }}</span>
+  {% if E.nb_manquantes %} · <span class="n-manque">{{ E.nb_manquantes }} note(s) manquante(s) sur {{ E.nb_eleves }}</span>{% endif %}
+  · Saisie {{ 'ouverte' if E.ouverte else 'fermée' }} par le titulaire de la classe
+  {% if E.retard %} · <b class="n-manque">en retard</b>{% endif %}
+</p>
+{% if F.stats %}
+<div class="n-chiffres">
+  <div class="n-chiffre"><b>{{ F.stats.moyenne|string|replace('.', ',') }}</b><span>Moyenne ({{ F.stats.moyenne_pct }} %)</span></div>
+  <div class="n-chiffre"><b>{{ F.stats.minimum }}</b><span>Plus petit point</span></div>
+  <div class="n-chiffre"><b>{{ F.stats.maximum }}</b><span>Plus grand point</span></div>
+  <div class="n-chiffre {{ 'rouge' if F.stats.sous_la_moitie else '' }}"><b>{{ F.stats.sous_la_moitie }}</b><span>Sous la moitié du maximum</span></div>
+</div>
+{% endif %}
+
+<div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
+  <div class="carte n-defile" style="flex:2 1 380px;margin:0">
+    <table class="tableau">
+      <thead><tr>{% if F.peut_demander %}<th title="Demande limitée aux élèves cochés"></th>{% endif %}<th>Élève</th><th class="pt">Points</th><th class="pt">%</th></tr></thead>
+      <tbody>
+      {% for e in F.eleves %}
+      <tr>{% if F.peut_demander %}<td><input type="checkbox" name="matricule" value="{{ e.matricule }}" form="f-demande" aria-label="Choisir {{ e.nom }}" style="width:auto;min-width:0"></td>{% endif %}
+        <td>{{ e.nom }}</td>
+        <td class="pt">{% if e.points is none %}<span class="n-manque">manquant</span>{% else %}{{ e.points }}{% endif %}</td>
+        <td class="pt">{{ (e.pourcentage ~ ' %') if e.pourcentage is not none else '' }}</td></tr>
+      {% else %}<tr><td colspan="4" class="sous">Aucun élève inscrit dans cette classe.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div style="flex:1 1 300px">
+    {% if F.peut_demander %}
+    <form method="post" id="f-demande" action="{{ url_for('etudes_notes_action', action='demander') }}" class="carte" style="margin:0 0 12px">
+      {{ champs() }}
+      <input type="hidden" name="id_cc" value="{{ F.id_cc }}"><input type="hidden" name="cle" value="{{ F.cle }}">
+      <h2 style="margin:0 0 6px;font-size:1.05rem">Demander au professeur</h2>
+      <label for="d-type">Type de demande</label>
+      <select id="d-type" name="type">
+        <option value="MANQUANTE" {{ 'selected' if E.nb_manquantes else '' }} {{ 'disabled' if not E.nb_manquantes else '' }}>Saisir les notes manquantes</option>
+        <option value="CORRECTION" {{ 'selected' if not E.nb_manquantes else '' }}>Corriger des points déjà saisis</option>
+      </select>
+      <label for="d-motif">Message au professeur</label>
+      <textarea id="d-motif" name="motif" rows="4" maxlength="1000" style="width:100%" placeholder="Ex. : le point de l'élève semble supérieur au maximum du cours ; vérifier la feuille de cotes.">{{ (N.form or {}).get('motif', '') }}</textarea>
+      <p class="n-note" style="margin:4px 0 8px">Cochez des élèves dans la liste pour limiter la demande à eux ; sinon elle porte sur toute la fiche. La direction ne modifie jamais un point : le professeur corrige lui-même, puis répond.</p>
+      <button type="submit">Envoyer la demande</button>
+    </form>
+    {% elif not F.matricule_prof %}
+    <div class="alerte-h" style="background:#FDF0DC;color:#6B4200;border-radius:8px;padding:8px 12px;font-size:.88rem">Aucun professeur n'est attribué à ce cours : attribuez-en un (Direction des études &gt; Programme des classes) avant de demander quoi que ce soit.</div>
+    {% else %}
+    <div class="carte" style="margin:0 0 12px"><p class="sous" style="margin:0">Vous pouvez consulter ces notes, mais pas envoyer de demande : le droit « Ajout » ne vous est pas accordé.</p></div>
+    {% endif %}
+    <h3 class="n-sec" style="margin-top:0">Demandes de cette fiche</h3>
+    {% for d in F.demandes %}
+    <div class="n-bloc">
+      <div class="tete"><span><b>{{ d.type_libelle }}</b>{% if d.eleve %} · {{ d.eleve }}{% endif %}</span><span class="n-pastille s-{{ d.statut }}">{{ d.statut_libelle }}</span></div>
+      <div class="n-note" style="margin:2px 0 0">{{ d.date }} · {{ d.par }}</div>
+      <p style="margin:4px 0 0;white-space:pre-line">{{ d.motif }}</p>
+      {% if d.reponse %}<p class="n-reponse"><b>{{ d.traite_par }}</b> ({{ d.date_traitement }}) : {{ d.reponse }}</p>{% endif %}
+    </div>
+    {% else %}<p class="sous">Aucune demande pour cette fiche.</p>{% endfor %}
+  </div>
+</div>
+
+{# ============================================================ 1. situation par période #}
+{% elif N.vue == 'synthese' and N.synthese %}
+{% set S = N.synthese %}
+<form method="get" class="n-filtre" aria-label="Choisir la période">
+  <input type="hidden" name="f" value="notes"><input type="hidden" name="vue" value="synthese">
+  <div><label for="n-annee">Année scolaire</label>
+    <select id="n-annee" name="annee">{% for a in N.annees %}<option value="{{ a }}" {{ 'selected' if a == S.annee else '' }}>{{ a }}</option>{% endfor %}</select></div>
+  <div><label for="n-cle">Période ou examen</label>
+    <select id="n-cle" name="cle">{% for p in S.periodes %}<option value="{{ p.cle }}" {{ 'selected' if p.cle == S.cle else '' }}>{{ p.libelle }}</option>{% endfor %}</select></div>
+  <div><button type="submit">Afficher</button></div>
+</form>
+{% if not S.periodes %}
+  <div class="carte"><p class="sous" style="margin:0">Aucune période n'est définie pour le secondaire en {{ S.annee }} (Direction des études &gt; Années, semestres et périodes).</p></div>
+{% else %}
+  {% set P = S.cible %}
+  <p class="n-note">{{ P.libelle }} : du {{ P.debut[8:10] }}/{{ P.debut[5:7] }}/{{ P.debut[:4] }} au {{ P.fin[8:10] }}/{{ P.fin[5:7] }}/{{ P.fin[:4] }} ·
+    {{ {'A_VENIR':'à venir','EN_COURS':'en cours','ECHUE':'échue'}[P.delai] }}. Un cours est « en retard » quand la période est échue et que des notes manquent.</p>
+  <div class="n-chiffres">
+    <div class="n-chiffre {{ 'vert' if S.total.taux == 100 else '' }}"><b>{{ (S.total.taux ~ ' %') if S.total.taux is not none else '—' }}</b><span>Fiches complètes ({{ S.total.complets }} sur {{ S.total.fiches }})</span></div>
+    <div class="n-chiffre {{ 'rouge' if S.total.manquantes else '' }}"><b>{{ S.total.manquantes }}</b><span>Notes manquantes</span></div>
+    <div class="n-chiffre {{ 'rouge' if S.total.en_retard else '' }}"><b>{{ S.total.en_retard }}</b><span>Cours en retard</span></div>
+  </div>
+  {% for k in S.classes %}
+  <h3 class="n-sec">{{ k.designation }}{% if k.option %} · {{ k.option }}{% endif %} <span class="sous" style="font-size:.82rem;font-weight:normal">· {{ k.nb_eleves }} élève(s) · saisie {{ 'ouverte' if k.ouverte else 'fermée' }}{% if k.manquantes %} · {{ k.manquantes }} note(s) manquante(s){% endif %}</span></h3>
+  <div class="carte n-defile" style="padding:4px 8px;margin:0 0 6px">
+    <table class="tableau">
+      <thead><tr><th>Cours</th><th>Professeur</th><th>État</th><th>Avancement</th><th class="nb">Saisies</th><th class="nb">Manquantes</th></tr></thead>
+      <tbody>
+      {% for f in k.cours %}
+      <tr>
+        <td><a class="lien" href="{{ url_for('etudes_sous_menu', sous='direction_etudes', f='notes', cc=f.id_cc, cle=S.cle) }}">{{ f.cours }}</a></td>
+        <td>{{ f.professeur or '—' }}</td>
+        <td><span class="n-pastille e-{{ f.etat }}">{{ f.etat_libelle }}</span>{% if f.retard %} <span class="n-manque" style="font-size:.78rem">en retard</span>{% endif %}</td>
+        <td>{% if f.etat != 'SANS_OBJET' %}<div class="n-barre" title="{{ f.nb_saisies }} sur {{ f.nb_eleves }}"><i style="width:{{ (100 * f.nb_saisies / f.nb_eleves)|round|int if f.nb_eleves else 0 }}%"></i></div>{% endif %}</td>
+        <td class="nb">{{ f.nb_saisies ~ ' / ' ~ f.nb_eleves if f.etat != 'SANS_OBJET' else '—' }}</td>
+        <td class="nb">{% if f.nb_manquantes %}<span class="n-manque">{{ f.nb_manquantes }}</span>{% else %}{{ 0 if f.etat != 'SANS_OBJET' else '—' }}{% endif %}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}<div class="carte"><p class="sous" style="margin:0">Aucun cours n'est ouvert dans les classes du secondaire pour {{ S.annee }}.</p></div>{% endfor %}
+{% endif %}
+
+{# ============================================================ 1b. vérification : élève, classe, cours, période, examen, total semestre #}
+{% elif N.vue == 'verif' %}
+<form method="get" class="n-filtre" aria-label="Vérifier les notes">
+  <input type="hidden" name="f" value="notes"><input type="hidden" name="vue" value="verif">
+  <div><label for="v-annee">Année scolaire</label>
+    <select id="v-annee" name="annee">{% for a in N.annees %}<option value="{{ a }}" {{ 'selected' if a == N.annee else '' }}>{{ a }}</option>{% endfor %}</select></div>
+  <div><label for="v-classe">Classe</label>
+    <select id="v-classe" name="classe"><option value="">Toutes / selon l'élève</option>{% for k in N.classes %}<option value="{{ k.n_classe }}" {{ 'selected' if k.n_classe|string == N.classe else '' }}>{{ k.designation }}{% if k.option %} · {{ k.option }}{% endif %}</option>{% endfor %}</select></div>
+  <div><label for="v-cours">Cours</label>
+    <select id="v-cours" name="cours"><option value="">Tous les cours</option>{% for c in N.cours %}<option value="{{ c.id_cc }}" {{ 'selected' if c.id_cc|string == N.id_cours else '' }}>{{ c.cours }}{% if not N.classe %} ({{ c.classe }}){% endif %}</option>{% endfor %}</select></div>
+  <div><label for="v-eleve">Élève (nom ou matricule)</label>
+    <input id="v-eleve" type="search" name="eleve" value="{{ N.eleve }}" placeholder="Ex. Kasongo ou 0001/26"></div>
+  <div><label for="v-cle">Colonne</label>
+    <select id="v-cle" name="cle"><option value="">Toutes (périodes, examens, semestres)</option>
+      {% for p in N.periodes %}<option value="{{ p.cle }}" {{ 'selected' if p.cle == N.cle else '' }}>{{ p.libelle }}</option>
+        {% if p.type == 'EXA' %}<option value="S{{ p.id_sem }}" {{ 'selected' if ('S' ~ p.id_sem) == N.cle else '' }}>Total {{ p.semestre }}</option>{% endif %}
+      {% endfor %}</select></div>
+  <div><button type="submit">Vérifier</button></div>
+</form>
+<p class="n-note">Choisissez une classe, un cours ou un élève. Les points viennent des mêmes calculs que les bulletins ; le total d'un semestre = périodes + examen. « Manquant » : aucun point saisi ; « Partiel » : total du semestre calculé avec une période ou l'examen sans point.</p>
+{% if not N.verif and not N.erreur %}
+  <div class="carte"><p class="sous" style="margin:0">Aucune vérification demandée pour l'instant.</p></div>
+{% elif N.verif %}
+{% set V = N.verif %}
+<div class="n-chiffres">
+  <div class="n-chiffre"><b>{{ V.nb_eleves }}</b><span>Élève(s) affiché(s)</span></div>
+  <div class="n-chiffre {{ 'rouge' if V.nb_manquantes else 'vert' }}"><b>{{ V.nb_manquantes }}</b><span>Case(s) manquante(s) ou partielle(s)</span></div>
+</div>
+<div style="margin:0 0 12px"><a class="bouton second" href="{{ url_for('etudes_notes_verification_csv', annee=V.annee, classe=V.n_classe or none, cours=V.id_cc or none, eleve=V.eleve or none, cle=V.cle or none) }}">Exporter en CSV</a></div>
+{% if V.tronque %}<div class="erreur">Seuls les {{ V.max_eleves }} premiers élèves sont affichés : précisez la classe, le cours ou le nom de l'élève.</div>{% endif %}
+{% for k in V.classes %}
+<h3 class="n-sec">{{ k.designation }}{% if k.option %} · {{ k.option }}{% endif %} <span class="sous" style="font-size:.82rem;font-weight:normal">· {{ k.effectif }} élève(s) dans la classe</span></h3>
+{% for e in k.eleves %}
+<div class="v-carte">
+  <div class="tete"><b>{{ e.nom }}</b><span class="sous">{{ e.matricule }}</span></div>
+  <div class="n-defile">
+  <table class="tableau">
+    <thead><tr><th>Cours</th>{% for c in V.colonnes %}<th class="pt {{ 'v-sem' if c.type == 'semestre' else '' }}" title="{{ c.semestre }}">{{ c.libelle if c.type != 'periode' else c.semestre ~ ' · ' ~ c.libelle }}</th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for l in e.lignes %}
+      <tr><td>{{ l.cours }}{% if l.professeur %}<div class="sous" style="font-size:.76rem">{{ l.professeur }}</div>{% endif %}</td>
+      {% for c in V.colonnes %}{% set x = l.cases[c.cle] %}
+        <td class="pt c-{{ x.etat }} {{ 'v-sem' if c.type == 'semestre' else '' }}" {% if x.manque %}title="Sans point : {{ x.manque|join(', ') }}"{% endif %}>
+          {% if x.obtenu is not none %}<b>{{ x.obtenu }}</b> / {{ x.max }}{% if x.pct is not none %} <span class="sous">({{ x.pct|string|replace('.', ',') }} %)</span>{% endif %}{% if x.etat == 'PARTIEL' %} <span class="n-pastille e-INCOMPLET">partiel</span>{% endif %}
+          {% elif x.etat == 'MANQUANT' %}manquant{% else %}—{% endif %}</td>
+      {% endfor %}</tr>
+    {% else %}<tr><td colspan="{{ V.colonnes|length + 1 }}" class="sous">Aucun cours.</td></tr>{% endfor %}
+      <tr class="v-total"><td>Total (tous les cours)</td>
+      {% for c in V.colonnes %}{% set t = e.total[c.cle] %}
+        <td class="pt {{ 'v-sem' if c.type == 'semestre' else '' }}">{% if t.obtenu is not none %}{{ t.obtenu }} / {{ t.max }} <span class="sous">({{ t.pct|string|replace('.', ',') }} %)</span>{% if t.rang %}<div class="sous" style="font-size:.76rem">rang {{ t.rang }}/{{ k.effectif }}{% if not t.complet %} · incomplet{% endif %}</div>{% endif %}{% else %}—{% endif %}</td>
+      {% endfor %}</tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+{% else %}<div class="carte"><p class="sous" style="margin:0">Aucun élève ne correspond à ces critères.</p></div>{% endfor %}
+{% else %}<div class="carte"><p class="sous" style="margin:0">Aucun résultat.</p></div>{% endfor %}
+{% endif %}
+
+{# ============================================================ 2. notes manquantes #}
+{% elif N.vue == 'manquantes' and N.manquantes %}
+{% set M = N.manquantes %}
+<form method="get" class="n-filtre" aria-label="Filtrer les notes manquantes">
+  <input type="hidden" name="f" value="notes"><input type="hidden" name="vue" value="manquantes">
+  <div><label for="m-annee">Année scolaire</label>
+    <select id="m-annee" name="annee">{% for a in N.annees %}<option value="{{ a }}" {{ 'selected' if a == M.annee else '' }}>{{ a }}</option>{% endfor %}</select></div>
+  <div><label style="display:flex;gap:6px;align-items:center;margin-top:18px"><input type="checkbox" name="en_cours" value="1" {{ 'checked' if M.en_cours else '' }} style="width:auto;min-width:0"> Inclure les périodes en cours</label></div>
+  <div><button type="submit">Afficher</button></div>
+</form>
+<p class="n-note">Fiches dont des élèves n'ont pas de point pour une période échue{{ ' ou en cours' if M.en_cours else '' }}. Un point vide veut aussi dire « élève absent » : le professeur l'explique dans sa réponse.</p>
+<div class="n-chiffres">
+  <div class="n-chiffre {{ 'rouge' if M.nb_fiches else 'vert' }}"><b>{{ M.nb_fiches }}</b><span>Fiches incomplètes</span></div>
+  <div class="n-chiffre {{ 'rouge' if M.nb_manquantes else 'vert' }}"><b>{{ M.nb_manquantes }}</b><span>Notes manquantes</span></div>
+  <div class="n-chiffre"><b>{{ M.professeurs|length }}</b><span>Professeur(s) concerné(s)</span></div>
+</div>
+{% if M.nb_fiches %}
+<div style="display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px">
+  {% if N.peut.AJOUT and M.nb_a_relancer %}
+  <form method="post" action="{{ url_for('etudes_notes_action', action='relancer') }}" onsubmit="return confirm('Envoyer {{ M.nb_a_relancer }} demande(s) de saisie aux professeurs concernés ?')">
+    <input type="hidden" name="vue" value="manquantes"><input type="hidden" name="annee" value="{{ M.annee }}">{% if M.en_cours %}<input type="hidden" name="en_cours" value="1">{% endif %}
+    <button type="submit">Demander la saisie à tous les professeurs ({{ M.nb_a_relancer }})</button></form>
+  {% endif %}
+  <a class="bouton second" href="{{ url_for('etudes_notes_csv', annee=M.annee, en_cours='1' if M.en_cours else none) }}">Exporter en CSV</a>
+</div>
+{% endif %}
+{% for g in M.professeurs %}
+<div class="n-bloc">
+  <div class="tete"><b>{{ g.nom }}</b><span class="n-manque">{{ g.nb_manquantes }} note(s) manquante(s) · {{ g.fiches|length }} fiche(s)</span></div>
+  <div class="n-defile">
+  <table class="tableau">
+    <thead><tr><th>Classe</th><th>Cours</th><th>Période</th><th class="nb">Saisies</th><th class="nb">Manquantes</th><th></th></tr></thead>
+    <tbody>
+    {% for f in g.fiches %}
+    <tr>
+      <td>{{ f.classe }}</td>
+      <td><a class="lien" href="{{ url_for('etudes_sous_menu', sous='direction_etudes', f='notes', cc=f.id_cc, cle=f.cle) }}">{{ f.cours }}</a></td>
+      <td>{{ f.periode }}</td>
+      <td class="nb">{{ f.nb_saisies }} / {{ f.nb_eleves }}</td>
+      <td class="nb"><span class="n-manque">{{ f.nb_manquantes }}</span></td>
+      <td>{% if f.demande_ouverte %}<span class="n-pastille s-OUVERTE">Demande envoyée</span>
+        {% elif N.peut.AJOUT and g.matricule %}
+        <form method="post" action="{{ url_for('etudes_notes_action', action='demander') }}" style="display:inline">
+          <input type="hidden" name="vue" value="manquantes"><input type="hidden" name="annee" value="{{ M.annee }}">{% if M.en_cours %}<input type="hidden" name="en_cours" value="1">{% endif %}
+          <input type="hidden" name="id_cc" value="{{ f.id_cc }}"><input type="hidden" name="cle" value="{{ f.cle }}"><input type="hidden" name="type" value="MANQUANTE">
+          <button type="submit" class="second" style="padding:4px 10px">Demander la saisie</button></form>
+        {% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% else %}<div class="carte"><p class="sous" style="margin:0">Aucune note manquante pour les périodes échues de {{ M.annee }}.</p></div>{% endfor %}
+
+{# ============================================================ 3. demandes de correction #}
+{% elif N.vue == 'demandes' and N.demandes is not none %}
+<form method="get" class="n-filtre" aria-label="Filtrer les demandes">
+  <input type="hidden" name="f" value="notes"><input type="hidden" name="vue" value="demandes">
+  <div><label for="q-annee">Année scolaire</label>
+    <select id="q-annee" name="annee">{% for a in N.annees %}<option value="{{ a }}" {{ 'selected' if a == N.annee else '' }}>{{ a }}</option>{% endfor %}</select></div>
+  <div><label for="q-statut">Statut</label>
+    <select id="q-statut" name="statut">
+      {% for cle, lib in N.statuts.items() %}<option value="{{ cle }}" {{ 'selected' if cle == N.statut else '' }}>{{ lib }}s</option>{% endfor %}
+      <option value="tout" {{ 'selected' if N.statut == 'tout' else '' }}>Toutes</option>
+    </select></div>
+  <div><button type="submit">Afficher</button></div>
+</form>
+{% for d in N.demandes %}
+<div class="n-bloc">
+  <div class="tete">
+    <span><b>{{ d.type_libelle }}</b> · {{ d.classe }} · <a class="lien" href="{{ url_for('etudes_sous_menu', sous='direction_etudes', f='notes', cc=d.id_cc, cle=d.cle) }}">{{ d.cours }}</a> · {{ d.periode }}{% if d.eleve %} · {{ d.eleve }}{% endif %}</span>
+    <span class="n-pastille s-{{ d.statut }}">{{ d.statut_libelle }}</span>
+  </div>
+  <div class="n-note" style="margin:2px 0 0">Pour {{ d.professeur or 'un cours sans professeur' }} · envoyée le {{ d.date }} par {{ d.par }}
+    {% if d.statut == 'OUVERTE' and not d.saisie_ouverte %} · <b class="n-manque">saisie fermée par le titulaire</b>{% endif %}
+    {% if d.maintenant_complet %} · <b style="color:var(--vert)">les notes sont maintenant complètes</b>{% elif d.manquantes_actuelles %} · {{ d.manquantes_actuelles }} note(s) encore manquante(s){% endif %}</div>
+  <p style="margin:4px 0 0;white-space:pre-line">{{ d.motif }}</p>
+  {% if d.reponse %}<p class="n-reponse"><b>{{ d.traite_par }}</b> ({{ d.date_traitement }}) : {{ d.reponse }}</p>
+  {% elif d.statut == 'TRAITEE' %}<p class="n-note" style="margin:6px 0 0">Traitée par {{ d.traite_par }} le {{ d.date_traitement }}, sans commentaire.</p>
+  {% elif d.statut == 'ANNULEE' %}<p class="n-note" style="margin:6px 0 0">Annulée par {{ d.traite_par }} le {{ d.date_traitement }}.</p>{% endif %}
+  {% if d.statut == 'OUVERTE' and N.peut.MODIFICATION %}
+  <form method="post" action="{{ url_for('etudes_notes_action', action='annuler') }}" style="margin-top:6px" onsubmit="return confirm('Annuler cette demande ?')">
+    <input type="hidden" name="vue" value="demandes"><input type="hidden" name="annee" value="{{ N.annee }}"><input type="hidden" name="statut" value="{{ N.statut }}">
+    <input type="hidden" name="id" value="{{ d.id }}"><button type="submit" class="second" style="padding:4px 10px">Annuler la demande</button></form>
+  {% endif %}
+</div>
+{% else %}<div class="carte"><p class="sous" style="margin:0">Aucune demande {{ '' if N.statut == 'tout' else '(' ~ (N.statuts.get(N.statut, '') | lower) ~ ') ' }}pour {{ N.annee }}.</p></div>{% endfor %}
+{% endif %}

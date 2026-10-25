@@ -1,0 +1,24 @@
+# Données de l'école : ne JAMAIS les mettre sur GitHub
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.csfbak
+*.csfupd
+donnees*/
+ancienne_version/
+sauvegardes/
+exports/
+
+# Secrets
+.env
+*.key
+
+# Python / outils
+__pycache__/
+*.pyc
+.ruff_cache/
+.venv/
+venv/
+.idea/
+.vscode/

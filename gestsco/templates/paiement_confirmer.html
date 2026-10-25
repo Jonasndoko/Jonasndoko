@@ -1,0 +1,20 @@
+{% extends "paiement_base.html" %}
+{% block contenu %}
+<form class="carte form" style="max-width:520px" method="post" action="{{ url_for('paiement_enregistrer', matricule=eleve.MATRICULE) }}"
+      onsubmit="this.querySelector('button[type=submit]').disabled=true">
+  <h1>Confirmer le paiement</h1>
+  <p class="sous">Vérifiez avant d'enregistrer : un reçu enregistré ne se modifie pas.</p>
+  <dl class="infos" style="grid-template-columns:1fr">
+    <div><dt>Élève</dt><dd>{{ nom }}</dd></div>
+    <div><dt>Année</dt><dd>{{ ligne.annee }}</dd></div>
+    <div><dt>Frais</dt><dd>{{ ligne.designation }}</dd></div>
+    <div><dt>Montant</dt><dd style="font-size:1.3rem">{{ centimes|montant }} {{ ligne.devise }}</dd></div>
+  </dl>
+  <input type="hidden" name="annee" value="{{ ligne.annee }}"><input type="hidden" name="codtf" value="{{ ligne.codtf }}">
+  <input type="hidden" name="montant" value="{{ centimes|montant }}"><input type="hidden" name="paye" value="{{ ligne.paye }}">
+  <div class="actions">
+    <button type="submit">Confirmer et enregistrer</button>
+    <a class="bouton second" href="{{ url_for('paiement_eleve', matricule=eleve.MATRICULE, annee=ligne.annee) }}">Annuler</a>
+  </div>
+</form>
+{% endblock %}

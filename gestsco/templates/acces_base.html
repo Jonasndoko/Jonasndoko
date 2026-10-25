@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block titre %}Gestionnaire d'accès{% endblock %}
+{% block entete %}
+{% if menu_utile %}<a class="bouton clair" href="/">Menu</a>{% endif %}
+<span style="font-size:.85rem">{{ s.nom_complet }} · {{ s.libelle_role }}</span>
+<form method="post" action="/deconnexion"><button class="clair" type="submit">Déconnexion</button></form>
+{% endblock %}
+{% block corps %}
+<style>
+.badge.inactif{background:#ECEEF3;color:#5A6785}
+button.danger,.bouton.danger{background:var(--rouge)}
+button.petit,.bouton.petit{padding:6px 12px;font-size:.85rem}
+.obligatoire::after{content:" *";color:var(--rouge)}
+.grille-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0 18px;align-items:end}
+tr.inactif td{color:var(--gris)}
+tr.choisi td{background:var(--fond)}
+.tableau td form{display:inline-flex}
+.deux{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:18px;align-items:start}
+.matrice th,.matrice td{text-align:center}.matrice th:first-child,.matrice td:first-child{text-align:left}
+.matrice input[type=checkbox]{width:auto;transform:scale(1.2)}
+.matrice input:disabled{opacity:.25}
+.case-ligne{display:flex;align-items:center;gap:8px;margin:8px 0;color:var(--texte)}.case-ligne input{width:auto}
+.secret{font-family:Consolas,"Courier New",monospace;font-size:2rem;font-weight:700;letter-spacing:.08em;text-align:center;padding:18px;border:1px solid var(--bord);border-radius:10px;background:var(--fond);word-break:break-all}
+.note{color:var(--gris);font-size:.82rem;margin:10px 0}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .badge.inactif{background:#222E4F;color:#B7C7EE}}
+</style>
+<h1>Gestionnaire d'accès</h1>
+<nav class="onglets" aria-label="Fonctionnalités du module">
+  {% for c, lib, lien in onglets %}<a href="{{ lien }}" class="{{ 'actif' if c == onglet else '' }}">{{ lib }}</a>{% endfor %}
+</nav>
+{% if ok %}<div class="succes" role="status">{{ ok }}</div>{% endif %}
+{% if erreur %}<div class="erreur" role="alert">{{ erreur }}</div>{% endif %}
+{% block contenu %}{% endblock %}
+{% endblock %}

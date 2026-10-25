@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block titre %}Connexion{% endblock %}
+{% block corps %}
+<form class="carte form" method="post" action="/connexion" autocomplete="on">
+  <h1>Connexion</h1>
+  <p class="sous">Entrez votre identifiant et votre mot de passe.</p>
+  {% if erreur %}<div class="erreur" role="alert">{{ erreur }}</div>{% endif %}
+  <label for="login">Identifiant</label>
+  <input id="login" name="login" autocomplete="username" autocapitalize="none" required autofocus>
+  <label for="mdp">Mot de passe</label>
+  <input id="mdp" name="mdp" type="password" autocomplete="current-password" required>
+  <button class="plein" type="submit">Se connecter</button>
+  <p class="sous" style="margin-top:16px;text-align:center"><a class="lien" href="/mot-de-passe-oublie">Mot de passe oublié ?</a></p>
+  <p class="sous" style="margin-top:8px;text-align:center">Vous êtes professeur ? <a class="lien" href="/professeur">Espace professeurs</a></p>
+</form>
+{% endblock %}

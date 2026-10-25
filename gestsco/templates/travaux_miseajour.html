@@ -1,0 +1,54 @@
+{% extends "travaux_base.html" %}
+{% block contenu %}
+{% if resultat %}
+<div class="carte">
+  <h2>{{ "Retour effectué" if resultat.retour else "Mise à jour installée" }}</h2>
+  <div class="succes" role="status">Version {{ resultat.ancienne }} → <strong>{{ resultat.nouvelle }}</strong> ({{ resultat.fichiers }} fichiers).
+    {% if resultat.securite %}Sauvegarde de sécurité de la base : {{ resultat.securite.name }}. {% endif %}Ancienne version gardée : {{ resultat.archive }}.</div>
+  <div class="alerte">⚠ <strong>Rechargez maintenant l'application</strong> pour que la nouvelle version soit utilisée{% if resultat.recharge %} (une demande de rechargement automatique a été envoyée à l'hébergeur ; si la version affichée en bas de page ne change pas, rechargez à la main){% else %} : sur PythonAnywhere, onglet <em>Web</em> puis bouton <em>Reload</em> ; sur un serveur, redémarrez le service{% endif %}. La structure de la base se met à jour toute seule au premier démarrage.</div>
+  <p><a class="bouton second" href="{{ url_for('travaux_miseajour') }}">Retour</a></p>
+</div>
+{% else %}
+<p class="sous">Version installée : <strong>{{ version }}</strong>. Installe un fichier de mise à jour (.csfupd) préparé par le développeur, sans passer par l'hébergeur. Le fichier est signé : il faut la <strong>clé de mise à jour</strong> communiquée séparément (par téléphone, par exemple) ; sans elle, ou si le fichier a été modifié, il est refusé.</p>
+<div class="alerte">⚠ Avant l'installation, une sauvegarde de sécurité de la base est faite et la version actuelle du programme est gardée (les 3 dernières). Après l'installation, <strong>rechargez l'application</strong> sur l'hébergeur.</div>
+
+{% if controle %}
+<div class="carte">
+  <h2>Fichier contrôlé</h2>
+  <p>✔ Signature valide : version <strong>{{ controle.version }}</strong>, {{ controle.nb }} fichiers. Empreinte : <strong>{{ controle.empreinte }}</strong> (comparez-la avec celle qu'on vous a communiquée).</p>
+  <form method="post" action="{{ url_for('travaux_miseajour_installer') }}">
+    <input type="hidden" name="f" value="{{ controle.nom }}">
+    <label for="cle">Clé de mise à jour</label><input id="cle" type="password" name="cle" autocomplete="off" required>
+    <label for="mdp">Votre mot de passe</label><input id="mdp" type="password" name="mdp" autocomplete="current-password" required>
+    <div style="margin-top:12px;display:flex;gap:10px">
+      <button type="submit">Installer la version {{ controle.version }}</button>
+    </div>
+  </form>
+  <form method="post" action="{{ url_for('travaux_miseajour_annuler') }}" style="margin-top:8px"><input type="hidden" name="f" value="{{ controle.nom }}"><button class="second" type="submit">Annuler</button></form>
+</div>
+{% else %}
+<div class="carte">
+  <h2>1. Envoyer et contrôler le fichier</h2>
+  <form method="post" action="{{ url_for('travaux_miseajour_controler') }}" enctype="multipart/form-data">
+    <label for="fichier">Fichier de mise à jour (.csfupd, {{ taille_max }} Mo au plus)</label>
+    <input id="fichier" type="file" name="fichier" accept=".csfupd" required>
+    <label for="cle1">Clé de mise à jour</label><input id="cle1" type="password" name="cle" autocomplete="off" required>
+    <div style="margin-top:12px"><button type="submit">Contrôler le fichier</button></div>
+  </form>
+</div>
+{% endif %}
+
+<div class="carte" style="margin-top:16px">
+  <h2>Versions gardées (retour en arrière)</h2>
+  {% if archives %}
+  <div class="defile"><table class="tableau"><tr><th>Version</th><th>Gardée le</th><th></th></tr>
+  {% for a in archives %}<tr><td>{{ a.version }}</td><td>{{ a.date_aff }}</td>
+    <td><form method="post" action="{{ url_for('travaux_miseajour_revenir') }}"><input type="hidden" name="nom" value="{{ a.nom }}">
+      <input type="password" name="mdp" placeholder="Votre mot de passe" autocomplete="current-password" required style="width:12rem">
+      <button class="danger petit" type="submit">Revenir à cette version</button></form></td></tr>{% endfor %}
+  </table></div>
+  <p class="sous">Le retour est refusé si la base a déjà été transformée par la version actuelle : restaurez alors la sauvegarde « Avant-mise-a-jour » (onglet Restauration).</p>
+  {% else %}<p class="sous">Aucune ancienne version gardée pour le moment.</p>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "controle_base.html" %}
+{% block contenu %}
+<form class="carte" method="get" action="/m/controle" id="choix">
+  <div class="cols" style="gap:0 16px">
+    <div><label for="annee">Année scolaire</label>
+      <select id="annee" name="annee"><option value="">—</option>
+        {% for a in ch.annees %}<option value="{{ a }}" {{ 'selected' if a == ch.annee else '' }}>{{ a }}</option>{% endfor %}</select></div>
+    <div><label for="classe">Classe</label>
+      <select id="classe" name="classe" onchange="document.getElementById('option').selectedIndex=0;this.form.submit()"><option value="">—</option>
+        {% for c in ch.classes %}<option value="{{ c }}" {{ 'selected' if c == ch.classe else '' }}>{{ c }}</option>{% endfor %}</select></div>
+    <div><label for="option">Option (humanités)</label>
+      <select id="option" name="option" {{ '' if ch.options else 'disabled' }}>
+        {% if ch.options %}<option value="">—</option>
+          {% for code, d in ch.options %}<option value="{{ code }}" {{ 'selected' if code == ch.option else '' }}>{{ d }}</option>{% endfor %}
+        {% else %}<option value="">{{ "Pas d'option" if ch.classe else "—" }}</option>{% endif %}</select></div>
+    <div><label for="frais">Type de frais</label>
+      <select id="frais" name="frais"><option value="">—</option>
+        {% for code, d in ch.types %}<option value="{{ code }}" {{ 'selected' if code == ch.frais else '' }}>{{ d }}</option>{% endfor %}</select></div>
+  </div>
+  <div class="actions">
+    <button type="submit">Afficher la liste</button>
+    <a class="bouton second" href="/m/controle">Annuler</a>
+    {% if liste and liste.lignes %}<a class="bouton second" target="_blank" href="{{ url_for('controle_liste_pdf', **qs) }}">Imprimer (PDF)</a>{% endif %}
+  </div>
+</form>
+<noscript><p class="sous">Après avoir choisi la classe, cliquez sur « Afficher la liste » pour voir ses options.</p></noscript>
+
+{% if erreur %}<div class="erreur espace" role="alert">{{ erreur }}</div>{% endif %}
+{% if info %}<div class="{{ 'alerte' if liste else 'sous' }} espace" role="status">{{ info }}</div>{% endif %}
+
+{% if liste %}
+<div class="carte espace">
+  <h2 style="font-family:Georgia,serif;text-align:center;font-size:1.1rem;margin:0">{{ liste.titre }}</h2>
+  <p style="text-align:center;font-weight:600;margin:4px 0 0">{{ sous_titre }}</p>
+  <p class="sous" style="text-align:center;margin-bottom:12px">Année scolaire {{ liste.annee }}</p>
+  {% if liste.lignes %}
+  <div class="defile"><table class="tableau">
+    <tr><th style="text-align:center">N°</th><th>NOM, POSTNOM ET PRENOM</th><th style="text-align:center">SEXE</th></tr>
+    {% for l in liste.lignes %}<tr><td style="text-align:center">{{ l.n }}</td><td>{{ l.nom_complet }}</td><td style="text-align:center">{{ l.sexe }}</td></tr>{% endfor %}
+  </table></div>
+  {% endif %}
+  <div class="ligne espace" style="justify-content:space-between">
+    <b style="font-size:.9rem">{{ liste.lignes|length }} élève(s) en ordre sur {{ liste.nb_inscrits }} inscrit(s)</b>
+    <u style="font-weight:700">{{ pied }}</u>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

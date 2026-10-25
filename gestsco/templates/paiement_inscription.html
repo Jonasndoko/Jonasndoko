@@ -1,0 +1,42 @@
+{% extends "paiement_base.html" %}
+{% block contenu %}
+<form class="carte" method="get" action="/m/paiement/inscription">
+  <p class="sous" style="margin-bottom:6px">Frais d'inscription d'une personne qui n'a pas encore de matricule. Le reçu servira ensuite à remplir sa candidature (module Inscription).</p>
+  {% if erreur %}<div class="erreur" role="alert">{{ erreur }}</div>{% endif %}
+  <div class="infos" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
+    <div><label for="nom">Nom du candidat</label><input id="nom" name="nom" value="{{ p.nom }}" autocomplete="off" required></div>
+    <div><label for="postnom">Postnom</label><input id="postnom" name="postnom" value="{{ p.postnom }}" autocomplete="off"></div>
+    <div><label for="prenom">Prénom</label><input id="prenom" name="prenom" value="{{ p.prenom }}" autocomplete="off"></div>
+    <div><label for="annee">Année scolaire</label><select id="annee" name="annee">
+      {% for a in annees %}<option value="{{ a }}" {{ 'selected' if a == p.annee else '' }}>{{ a }}</option>{% endfor %}</select></div>
+    <div><label for="classe">Classe souhaitée</label><select id="classe" name="classe">
+      <option value="">— choisir —</option>
+      {% for n, libelle in classes %}<option value="{{ n }}" {{ 'selected' if n|string == p.classe else '' }}>{{ libelle }}</option>{% endfor %}</select></div>
+  </div>
+  <div class="actions"><button type="submit">Afficher les frais d'inscription</button></div>
+</form>
+
+{% if sans_frais %}
+<div class="alerte espace" role="alert">Aucun frais d'inscription n'est défini pour cette classe. L'Administrateur doit marquer un type de frais comme « frais d'inscription » et lui donner un montant (Travaux techniques &gt; Mise à jour des tables &gt; Types de frais / Tarifs).</div>
+{% elif frais %}
+<div class="carte espace">
+  <h2 style="margin:0 0 10px;font-size:1.05rem">Frais d'inscription à payer</h2>
+  <div class="defile"><table class="tableau">
+    <tr><th>Frais</th><th class="nb">Montant (en une seule fois)</th><th></th></tr>
+    {% for codtf, designation, montant, devise in frais %}
+    <tr>
+      <td>{{ designation }}</td><td class="nb">{{ montant|montant }} {{ devise }}</td>
+      <td>
+        <form method="post" action="/m/paiement/inscription/confirmer">
+          <input type="hidden" name="nom" value="{{ p.nom }}"><input type="hidden" name="postnom" value="{{ p.postnom }}">
+          <input type="hidden" name="prenom" value="{{ p.prenom }}"><input type="hidden" name="annee" value="{{ p.annee }}">
+          <input type="hidden" name="classe" value="{{ p.classe }}"><input type="hidden" name="codtf" value="{{ codtf }}">
+          <button type="submit">Payer</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table></div>
+</div>
+{% endif %}
+{% endblock %}

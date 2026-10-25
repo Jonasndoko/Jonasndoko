@@ -1,0 +1,39 @@
+{% extends "paiement_base.html" %}
+{% block contenu %}
+<div class="carte" style="max-width:560px">
+  {% if recu.statut != "VALIDE" %}<div class="erreur">Ce reçu est annulé : il ne peut pas être imprimé.</div>
+  {% else %}<div class="succes">✔ Reçu N° {{ recu.n_recu }} enregistré.</div>{% endif %}
+  <dl class="infos" style="grid-template-columns:1fr 1fr">
+    <div><dt>{{ "Candidat" if recu.candidat else "Élève" }}</dt><dd>{{ recu.nom_complet }}</dd></div>
+    <div><dt>Classe</dt><dd>{{ recu.classe }}{% if recu.option %} · {{ recu.option }}{% endif %}</dd></div>
+    <div><dt>Frais</dt><dd>{{ recu.type_frais }}</dd></div>
+    <div><dt>Montant payé</dt><dd>{{ recu.montant_txt }} {{ recu.devise }}</dd></div>
+    {% if recu.tranche %}<div><dt>Tranche concernée</dt><dd>{{ recu.tranche.numero }} sur {{ recu.tranche.nombre }}</dd></div>
+    <div><dt>Reste à payer (tranche)</dt><dd>{{ recu.tranche.reste_txt }} {{ recu.devise }}</dd></div>{% endif %}
+    <div><dt>Date</dt><dd>{{ recu.date_txt }} {{ recu.heure_txt }}</dd></div>
+  </dl>
+  {% if recu.statut == "VALIDE" and recu.code_parent %}
+  <div class="carte" style="margin:14px 0;text-align:center;background:#f4f6fb">
+    {% if recu.code_parent.utilise %}
+    <b>Application des parents</b><br><span class="sous" style="margin:0">Le code d'accès de ce reçu a déjà été utilisé par le parent.</span>
+    {% else %}
+    <span class="sous" style="margin:0">Code d'accès de l'application des parents (à remettre au parent, un seul usage)</span>
+    <div style="font-size:1.9rem;font-weight:700;letter-spacing:.12em;margin:6px 0;font-family:monospace">{{ recu.code_parent.code }}</div>
+    <span class="sous" style="margin:0;font-size:.85rem">Lien de téléchargement : <b>{{ lien_appli }}</b></span>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% if recu.statut == "VALIDE" %}
+  <div class="actions">
+    {% if original_possible %}<a class="bouton" href="{{ url_for('paiement_recu_pdf', n_recu=recu.n_recu) }}" target="_blank" rel="noopener">Imprimer le reçu</a>{% endif %}
+    <a class="bouton second" href="{{ url_for('paiement_recu_pdf', n_recu=recu.n_recu, duplicata=1) }}" target="_blank" rel="noopener">Imprimer un duplicata</a>
+  </div>
+  {% if original_possible %}<p class="sous" style="margin:10px 0 0;font-size:.8rem">Le reçu original reste imprimable {{ delai_original }} minutes. Passé ce délai, seul un duplicata (identique au reçu) est possible.</p>
+  {% else %}<p class="sous" style="margin:10px 0 0;font-size:.8rem">Le reçu original n'est imprimable que par son percepteur, juste après l'enregistrement. Ici : duplicata.</p>{% endif %}
+  {% endif %}
+  <div class="actions">
+    {% if recu.matricule %}<a class="bouton second" href="{{ url_for('paiement_eleve', matricule=recu.matricule, annee=recu.annee) }}">Retour à l'élève</a>{% endif %}
+    <a class="bouton second" href="/m/paiement">Nouveau paiement</a>
+  </div>
+</div>
+{% endblock %}

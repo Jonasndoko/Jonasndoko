@@ -1,0 +1,50 @@
+{% extends "encaissement_base.html" %}
+{% block contenu %}
+<form class="carte" method="get" action="/m/encaissement/rapport">
+  <div class="ligne">
+    <div style="flex:1;min-width:160px"><label for="date">Date du rapport (jj/mm/aaaa)</label><input id="date" name="date" value="{{ texte_date }}" placeholder="08/10/2026"></div>
+    <div style="align-self:end"><button type="submit">Consulter</button></div>
+  </div>
+</form>
+{% if erreur %}<div class="erreur espace" role="alert">{{ erreur }}</div>{% endif %}
+{% if rapport %}
+  {% if vide %}
+  <div class="alerte espace">Aucun paiement ni encaissement enregistré le {{ rapport.date_txt }}.{% if rapport.nb_annules %} ({{ rapport.nb_annules }} reçu(s) annulé(s) non comptés.){% endif %}</div>
+  {% else %}
+  <div class="carte espace">
+    <p class="sous" style="margin-bottom:10px">Tous les percepteurs · {{ rapport.nb_recus }} reçu(s) et {{ rapport.nb_encaissements }} encaissement(s) le {{ rapport.date_txt }}{% if rapport.nb_annules %} · {{ rapport.nb_annules }} reçu(s) annulé(s) non comptés{% endif %}</p>
+    {% if rapport.sans_versement %}<div class="alerte">Attention : aucun encaissement enregistré pour : {{ rapport.sans_versement|join(", ") }}</div>{% endif %}
+
+    <h2 style="font-size:1.05rem;margin:6px 0">1. Paiements de la journée, par type de frais</h2>
+    {% if not rapport.groupes %}<p class="sous">Aucun paiement enregistré à cette date.</p>{% else %}
+    <div class="defile"><table class="tableau">
+      <tr><th>N°</th><th>Percepteur</th><th class="nb">Reçus</th><th class="nb">Montant encaissé (reçus)</th></tr>
+      {% for g in rapport.groupes %}
+      <tr class="groupe"><td colspan="4">TYPE DE FRAIS : {{ g.type_frais|upper }}</td></tr>
+      {% for l in g.lignes %}<tr><td>{{ loop.index }}</td><td>{{ l.percepteur }}</td><td class="nb">{{ l.nb_recus }}</td><td class="nb">{{ l.montant_txt }}</td></tr>{% endfor %}
+      <tr class="total"><td colspan="2">Total {{ g.type_frais }}</td><td class="nb">{{ g.nb_recus }}</td>
+        <td class="nb">{% for dev, c in g.totaux %}{{ c|montant }} {{ dev }}{{ " ; " if not loop.last }}{% endfor %}</td></tr>
+      {% endfor %}
+    </table></div>
+    {% if rapport.totaux %}<p style="font-weight:700;margin:10px 0 0">TOTAL DES PAIEMENTS : {% for dev, c in rapport.totaux %}{{ c|montant }} {{ dev }}{{ " ; " if not loop.last }}{% endfor %}</p>{% endif %}
+    {% endif %}
+
+    <h2 style="font-size:1.05rem;margin:22px 0 6px">2. Encaissements et versements des percepteurs</h2>
+    {% if not rapport.versements %}<p class="sous">Aucun encaissement enregistré à cette date.</p>{% else %}
+    <div class="defile"><table class="tableau">
+      <tr><th>N° op.</th><th>Percepteur</th><th>Devise</th><th class="nb">Encaissé</th><th class="nb">Versé</th><th class="nb">Écart</th><th></th></tr>
+      {% for v in rapport.versements %}
+      <tr><td>{{ v.n_enc }}</td><td>{{ v.percepteur }}</td><td>{{ v.devise }}</td><td class="nb">{{ v.encaisse_txt }}</td><td class="nb">{{ v.verse_txt }}</td>
+        <td class="nb" style="color:{{ 'var(--rouge)' if v.ecart > 0 else ('var(--vert)' if v.ecart < 0 else 'inherit') }}">{{ v.ecart_txt }}</td>
+        <td>{% if v.ecart > 0 %}<span class="badge impaye">Manquant</span>{% elif v.ecart < 0 %}<span class="badge solde">Excédent</span>{% endif %}</td></tr>
+      {% endfor %}
+      {% for dev, enc, ver, ecart in rapport.totaux_versements %}
+      <tr class="total"><td colspan="2">Total {{ dev }}</td><td>{{ dev }}</td><td class="nb">{{ enc|montant }}</td><td class="nb">{{ ver|montant }}</td><td class="nb">{{ ecart|montant }}</td><td></td></tr>
+      {% endfor %}
+    </table></div>
+    {% endif %}
+    <div class="actions"><a class="bouton" target="_blank" rel="noopener" href="{{ url_for('encaissement_rapport_pdf', date=texte_date) }}">Imprimer le rapport (PDF)</a></div>
+  </div>
+  {% endif %}
+{% endif %}
+{% endblock %}

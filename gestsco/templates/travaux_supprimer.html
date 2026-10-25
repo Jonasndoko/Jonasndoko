@@ -1,0 +1,18 @@
+{% extends "travaux_base.html" %}
+{% block contenu %}
+<div class="carte">
+  <h2 style="margin:0 0 8px;font-size:1.15rem">Supprimer avec les données liées ?</h2>
+  <p><b>{{ nom }}</b> ({{ t.titre }}) est utilisée ailleurs :</p>
+  <ul>{% for titre, n in apercu.liees %}<li>{{ titre }} : {{ n }}</li>{% endfor %}</ul>
+  {% if apercu.possible %}
+  <div class="alerte">Cette opération supprime la donnée ET toutes les données liées ci-dessus. Elle est définitive : faites d'abord une sauvegarde (onglet « Sauvegarde »).</div>
+  <form method="post" action="{{ url_for('travaux_supprimer') }}">
+    <input type="hidden" name="t" value="{{ t.cle }}"><input type="hidden" name="k" value="{{ k }}"><input type="hidden" name="avec_liees" value="1">
+    <div class="actions"><button class="danger" type="submit">Supprimer la donnée et les données liées</button><a class="bouton second" href="{{ url_for('travaux_tables', t=t.cle) }}">Annuler</a></div>
+  </form>
+  {% else %}
+  <div class="erreur">Suppression impossible : {{ apercu.recus }} reçu(s) de paiement en dépendent, et un reçu ne se supprime jamais (même annulé), car il appartient à la comptabilité.{% if t.peut_desactiver %} Désactivez plutôt cette donnée : elle ne sera plus proposée, mais l'historique reste intact.{% endif %}</div>
+  <div class="actions"><a class="bouton second" href="{{ url_for('travaux_tables', t=t.cle) }}">Retour à la liste</a></div>
+  {% endif %}
+</div>
+{% endblock %}

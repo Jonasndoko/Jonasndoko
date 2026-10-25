@@ -1,0 +1,13 @@
+{% extends "accueil_base.html" %}
+{% block titre %}Menu principal{% endblock %}
+{% block corps %}
+<div class="carte" style="max-width:640px">
+<h1>Menu principal</h1>
+<p class="sous">Bienvenue, {{ s.nom_complet }}</p>
+{% if modules %}
+<p>Choisissez un module dans la barre latérale pour commencer.</p>
+{% else %}
+<p>Aucun module n'est ouvert à votre compte. Contactez l'Administrateur.</p>
+{% endif %}
+</div>
+{% endblock %}

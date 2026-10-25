@@ -1,0 +1,72 @@
+{% extends "inscription_base.html" %}
+{% macro champ(nom, libelle, obligatoire=True, aide="", mode="") %}
+  <label for="{{ nom }}">{{ libelle }}{% if obligatoire %} <span style="color:var(--rouge)">*</span>{% endif %}</label>
+  <input id="{{ nom }}" name="{{ nom }}" value="{{ saisie[nom] }}" autocomplete="off"{% if mode %} inputmode="{{ mode }}"{% endif %}{% if aide %} placeholder="{{ aide }}"{% endif %}>
+{% endmacro %}
+{% block contenu %}
+{% if succes %}<div class="succes" role="status">{{ succes }}
+  {% if n_cand_ok %}<div class="actions" style="margin-top:8px"><a class="bouton" target="_blank" rel="noopener" href="{{ url_for('inscription_fiche_pdf', n_cand=n_cand_ok) }}">Imprimer la fiche (PDF)</a></div>{% endif %}</div>{% endif %}
+{% if erreur %}<div class="erreur" role="alert">{{ erreur }}</div>{% endif %}
+{% if avertissement %}<div class="alerte" role="alert">{{ avertissement }}</div>{% endif %}
+<form method="post" action="/m/inscription/enregistrer" onsubmit="var b=this.querySelector('button[data-enregistrer]');if(b){b.disabled=true}">
+  <div class="carte">
+    <h2 style="margin:0 0 4px;font-size:1.1rem">Paiement des frais d'inscription</h2>
+    <p class="sous" style="margin-bottom:4px">Sans reçu valide, aucune candidature n'est enregistrée.</p>
+    <label for="n_recu">N° du reçu de paiement des frais d'inscription <span style="color:var(--rouge)">*</span></label>
+    <div class="ligne">
+      <input id="n_recu" name="n_recu" value="{{ saisie.n_recu }}" autocomplete="off" inputmode="numeric" placeholder="0004" style="max-width:12rem">
+      <button type="submit" class="second" formaction="/m/inscription/verifier-recu" formnovalidate>Vérifier le paiement</button>
+    </div>
+    {% if recu %}<div class="succes espace" role="status">Paiement confirmé : {{ recu.type_frais }} - {{ recu.montant_txt }} {{ recu.devise }} (reçu du {{ recu.date_txt }}, année {{ recu.annee }}).</div>{% endif %}
+    {% if erreur_recu %}<div class="erreur espace" role="alert">{{ erreur_recu }}</div>{% endif %}
+  </div>
+
+  <div class="carte espace">
+    <div class="cols">
+      <div>
+        <h2 style="margin:0 0 4px;font-size:1.1rem">Identité du candidat</h2>
+        {{ champ("nom", "Nom") }}
+        {{ champ("postnom", "Postnom", False) }}
+        {{ champ("prenom", "Prénom", False) }}
+        <label for="sexe">Sexe <span style="color:var(--rouge)">*</span></label>
+        <select id="sexe" name="sexe">
+          <option value="">— Choisissez —</option>
+          <option value="M" {{ 'selected' if saisie.sexe == 'M' else '' }}>Masculin</option>
+          <option value="F" {{ 'selected' if saisie.sexe == 'F' else '' }}>Féminin</option>
+        </select>
+        {{ champ("date_naissance", "Date de naissance (jj/mm/aaaa)", True, "15/03/2012", "numeric") }}
+        {{ champ("lieu_naissance", "Lieu de naissance", False) }}
+        {{ champ("nationalite", "Nationalité", False) }}
+        {{ champ("adresse", "Adresse") }}
+        {{ champ("telephone", "Téléphone", False, "", "tel") }}
+      </div>
+      <div>
+        <h2 style="margin:0 0 4px;font-size:1.1rem">Parcours scolaire</h2>
+        {{ champ("ecole_origine", "Ancienne école") }}
+        {{ champ("pourcent_origine", "Pourcentage obtenu (ex. 68 ou 68,5)", True, "", "decimal") }}
+        <label>Doublant ? <span style="color:var(--rouge)">*</span></label>
+        <div class="ligne" style="gap:22px">
+          <label style="display:flex;gap:6px;align-items:center;margin:0;color:var(--texte)"><input type="radio" name="doublant" value="1" style="width:auto" {{ 'checked' if saisie.doublant == '1' else '' }}> Oui</label>
+          <label style="display:flex;gap:6px;align-items:center;margin:0;color:var(--texte)"><input type="radio" name="doublant" value="0" style="width:auto" {{ 'checked' if saisie.doublant == '0' else '' }}> Non</label>
+        </div>
+        <label for="n_classe">Classe dans laquelle il veut être inscrit <span style="color:var(--rouge)">*</span></label>
+        <select id="n_classe" name="n_classe">
+          <option value="">— Choisissez —</option>
+          {% for n, libelle in classes %}<option value="{{ n }}" {{ 'selected' if saisie.n_classe == n|string else '' }}>{{ libelle }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <h2 style="margin:0 0 4px;font-size:1.1rem">Tuteur</h2>
+        {{ champ("nom_tuteur", "Nom du tuteur") }}
+        {{ champ("tel_tuteur", "Téléphone du tuteur", True, "", "tel") }}
+        {{ champ("adresse_tuteur", "Adresse du tuteur") }}
+        <p class="sous" style="margin-top:14px;font-size:.85rem"><span style="color:var(--rouge)">*</span> champ obligatoire</p>
+      </div>
+    </div>
+    <div class="actions">
+      <button type="submit" data-enregistrer {{ 'disabled' if avertissement else '' }}>Enregistrer la candidature</button>
+      <a class="bouton second" href="/m/inscription">Annuler</a>
+    </div>
+  </div>
+</form>
+{% endblock %}

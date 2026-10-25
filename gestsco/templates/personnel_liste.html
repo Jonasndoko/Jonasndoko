@@ -1,0 +1,40 @@
+{% extends "personnel_base.html" %}
+{% block contenu %}
+<form class="carte" method="get" action="/m/personnel/liste">
+  <div class="grille-form">
+    <div><label for="mode">Grouper</label>
+      <select id="mode" name="mode" required><option value="">—</option>{% for cle, lib in modes.items() %}<option value="{{ cle }}" {{ 'selected' if mode == cle }}>{{ lib|capitalize }}</option>{% endfor %}</select></div>
+    <div><label for="filtre">Une seule fonction ou un seul service (facultatif)</label>
+      <select id="filtre" name="filtre"><option value="">Tous</option>
+        {% for g, lib in (('FONCTION','Fonctions'),('SERVICE','Services')) %}<optgroup label="{{ lib }}">{% for o in options[g] %}<option value="{{ g }}:{{ o.id }}" data-genre="{{ g }}" {{ 'selected' if filtre == o.id|string and mode == g }}>{{ o.libelle }}</option>{% endfor %}</optgroup>{% endfor %}
+      </select></div>
+    <div><label for="jour">Situation au</label><input id="jour" type="date" name="jour" value="{{ jour }}"></div>
+  </div>
+  <p class="sous" style="margin:8px 0 0;font-size:.85rem">Le filtre ne s'applique que s'il correspond au regroupement choisi (fonction avec « par fonction », service avec « par service »).</p>
+  <div class="actions"><button type="submit">Afficher la liste</button></div>
+</form>
+<script>
+// le filtre n'est valable que pour le regroupement choisi : on masque l'autre groupe d'options
+(function(){var m=document.getElementById('mode'),f=document.getElementById('filtre');
+ function maj(){[].forEach.call(f.querySelectorAll('option[data-genre]'),function(o){var ok=!m.value||o.dataset.genre===m.value;o.hidden=!ok;o.disabled=!ok;if(!ok&&o.selected)f.value='';});}
+ m.addEventListener('change',maj);maj();})();
+</script>
+{% if liste %}
+<div class="carte espace">
+  <div class="ligne" style="justify-content:space-between">
+    <div><h2 style="margin:0;font-size:1.05rem">{{ liste.titre }}</h2>
+      <span class="sous" style="margin:0">{% if liste.filtre %}{{ 'Fonction' if liste.mode == 'FONCTION' else 'Service' }} : {{ liste.filtre }} · {% endif %}Situation au {{ liste.jour }} · {{ liste.total }} agent(s)</span></div>
+    {% if liste.total %}<a class="bouton second" target="_blank" href="/m/personnel/liste.pdf?mode={{ mode }}&amp;filtre={{ (mode ~ ':' ~ filtre)|urlencode if filtre else '' }}&amp;jour={{ jour|urlencode }}">Imprimer (PDF)</a>{% endif %}
+  </div>
+  {% if liste.groupes %}
+  <div class="defile espace"><table class="tableau">
+    <tr><th>Matricule</th><th>Nom complet</th><th>{{ 'Service' if liste.mode == 'FONCTION' else 'Fonction' }}</th><th>Responsabilité</th><th>Depuis</th><th>Téléphone</th></tr>
+    {% for g in liste.groupes %}
+    <tr class="groupe"><td colspan="6">{{ g.libelle }} ({{ g.agents|length }})</td></tr>
+    {% for a in g.agents %}<tr><td>{{ a.matricule }}</td><td>{{ a.nom_complet }}</td><td>{{ (a.service if liste.mode == 'FONCTION' else a.fonction) or '—' }}</td><td>{{ a.responsabilite or '—' }}</td><td>{{ a.depuis or '—' }}</td><td>{{ a.telephone }}</td></tr>{% endfor %}
+    {% endfor %}
+  </table></div>
+  {% else %}<p class="sous espace" style="margin-bottom:0">Aucun agent en service à cette date.</p>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

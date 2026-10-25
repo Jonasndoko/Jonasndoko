@@ -1,0 +1,52 @@
+<p class="sous">Les cours se définissent par niveau, avec une option (humanités) et une année d'étude quand elles s'appliquent. Un cours déjà ouvert dans une classe ne change plus de niveau, d'option ni d'année d'étude : on le désactive.</p>
+<div class="carte">
+  <form method="get" action="{{ url_for('etudes_sous_menu', sous='direction_etudes') }}" class="ligne" style="margin-bottom:12px"><input type="hidden" name="f" value="cours">
+    <select name="n" aria-label="Niveau" style="width:auto"><option value="">Tous les niveaux</option>{% for nv in choix.niveaux %}<option value="{{ nv.code }}" {{ 'selected' if nv.code == n else '' }}>{{ nv.libelle }}</option>{% endfor %}</select>
+    <input type="search" name="q" value="{{ q }}" placeholder="Rechercher un cours…" aria-label="Rechercher" maxlength="60">
+    <button class="second" type="submit">Afficher</button>
+  </form>
+  <div class="defile"><table class="tableau">
+    <tr><th>Cours</th><th>Niveau</th><th>Option</th><th>Année d'étude</th><th class="nb">Heures/sem.</th><th class="nb">Classes</th><th></th></tr>
+    {% for c in liste %}<tr class="{{ 'inactif' if not c.actif else '' }}"><td>{{ c.libelle }}{% if not c.actif %} <span class="badge inactif">désactivé</span>{% endif %}</td><td>{{ c.niveau }}</td><td>{{ c.option }}</td><td>{{ c.annee_etude }}</td><td class="nb">{{ c.heures }}</td><td class="nb">{{ c.nb_classes }}</td>
+      <td style="white-space:nowrap">
+        {% if d.modif %}<a class="bouton second petit" href="{{ url_for('etudes_sous_menu', sous='direction_etudes', f='cours', e=c.id, n=n, q=q) }}#formulaire">Modifier</a>
+        <form method="post" action="{{ url_for('gestion_cours_activite') }}"><input type="hidden" name="id" value="{{ c.id }}"><input type="hidden" name="n" value="{{ n }}"><input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="action" value="{{ 'desactiver' if c.actif else 'activer' }}"><button class="second petit" type="submit">{{ 'Désactiver' if c.actif else 'Réactiver' }}</button></form>{% endif %}
+        {% if d.suppr and c.nb_classes == 0 %}<form method="post" action="{{ url_for('gestion_cours_supprimer') }}" onsubmit="return confirm('Supprimer le cours « {{ c.libelle|replace("'", "’") }} » ?')"><input type="hidden" name="id" value="{{ c.id }}"><input type="hidden" name="n" value="{{ n }}"><input type="hidden" name="q" value="{{ q }}"><button class="danger petit" type="submit">Supprimer</button></form>{% endif %}
+      </td></tr>
+    {% else %}<tr><td colspan="7" class="sous">Aucun cours.</td></tr>{% endfor %}
+  </table></div>
+  <p class="sous" style="margin:10px 0 0">{{ liste|length }} cours</p>
+</div>
+{% if (modif and d.modif) or (not modif and d.ajout) %}
+<div class="carte espace" id="formulaire">
+  <h2 style="margin:0 0 12px;font-size:1.1rem">{{ 'Modifier le cours' if modif else 'Nouveau cours' }}</h2>
+  <form method="post" action="{{ url_for('gestion_cours_enregistrer') }}">
+    {% if modif %}<input type="hidden" name="id" value="{{ modif.id }}">{% endif %}<input type="hidden" name="n" value="{{ n }}"><input type="hidden" name="q" value="{{ q }}">
+    <div class="grille-form">
+      <div class="large"><label for="c-libelle" class="obligatoire">Nom du cours</label><input id="c-libelle" name="libelle" value="{{ f.libelle or '' }}" maxlength="80" required autocomplete="off"></div>
+      <div><label for="c-niveau" class="obligatoire">Niveau</label><select id="c-niveau" name="code_niveau" required><option value="">— choisir —</option>{% for nv in choix.niveaux %}<option value="{{ nv.code }}" {{ 'selected' if nv.code == f.code_niveau else '' }}>{{ nv.libelle }}</option>{% endfor %}</select></div>
+      <div><label for="c-option">Option (si elle s'applique)</label><select id="c-option" name="code_option"><option value="">— toutes les options —</option></select></div>
+      <div><label for="c-annee">Année d'étude (si elle s'applique)</label><select id="c-annee" name="annee_etude"><option value="">— toutes —</option></select></div>
+      <div><label for="c-heures">Heures par semaine</label><input id="c-heures" name="heures_semaine" value="{{ f.heures_semaine or '' }}" inputmode="numeric" maxlength="2" autocomplete="off"></div>
+    </div>
+    <div class="actions"><button type="submit">Enregistrer</button>{% if modif %}<a class="bouton second" href="{{ url_for('etudes_sous_menu', sous='direction_etudes', f='cours', n=n, q=q) }}">Annuler</a>{% endif %}</div>
+  </form>
+</div>
+<script>
+(function(){
+  var CHOIX = {{ choix.niveaux|tojson }}, VOULU = {option: {{ (f.code_option or '')|tojson }}, annee: {{ (f.annee_etude or '')|tojson }}};
+  var niv = document.getElementById("c-niveau"), opt = document.getElementById("c-option"), an = document.getElementById("c-annee");
+  function remplir(sel, vide, liste, voulu){
+    sel.innerHTML = ""; var o = document.createElement("option"); o.value = ""; o.textContent = vide; sel.appendChild(o);
+    liste.forEach(function(x){ var e = document.createElement("option"); e.value = x[0]; e.textContent = x[1]; if (x[0] === voulu) e.selected = true; sel.appendChild(e); });
+  }
+  function maj(){
+    var n = CHOIX.find(function(x){ return x.code === niv.value; });
+    remplir(opt, "— toutes les options —", n ? n.options.map(function(x){ return [x.code, x.libelle]; }) : [], VOULU.option);
+    remplir(an, "— toutes —", n ? n.annees_etude.map(function(x){ return [x, x]; }) : [], VOULU.annee);
+    VOULU = {option: "", annee: ""};
+  }
+  niv.addEventListener("change", maj); maj();
+})();
+</script>
+{% endif %}

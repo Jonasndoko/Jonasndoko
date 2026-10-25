@@ -1,0 +1,47 @@
+{% extends "personnel_base.html" %}
+{% block contenu %}
+<form class="carte" method="get" action="/m/personnel/etats">
+  <div class="grille-form">
+    <div><label for="debut" class="obligatoire">Du</label><input id="debut" type="date" name="debut" value="{{ debut }}" required></div>
+    <div><label for="fin" class="obligatoire">Au</label><input id="fin" type="date" name="fin" value="{{ fin }}" required></div>
+    <div><label for="cible">Personnel concerné</label>
+      <select id="cible" name="cible"><option value="">Tout le personnel</option>
+        {% for g, lib in (('FONCTION','Fonction'),('SERVICE','Service')) %}<optgroup label="{{ lib }}">{% for o in options[g] %}<option value="{{ g }}:{{ o.id }}" {{ 'selected' if cible == g ~ ':' ~ o.id }}>{{ o.libelle }}</option>{% endfor %}</optgroup>{% endfor %}</select></div>
+  </div>
+  <div class="ligne espace" style="font-size:.88rem">Raccourcis :
+    {% for nom, d1, d2 in raccourcis %}<a class="lien" href="/m/personnel/etats?debut={{ d1 }}&amp;fin={{ d2 }}&amp;cible={{ cible|urlencode }}">{{ nom }}</a>{% endfor %}</div>
+  <div class="actions"><button type="submit">Afficher l'état</button></div>
+</form>
+
+{% if etat %}
+<div class="carte espace">
+  <div class="ligne" style="justify-content:space-between">
+    <div><h2 style="margin:0;font-size:1.05rem">{{ etat.titre }}</h2>
+      <span class="sous" style="margin:0">Du {{ etat.debut }} au {{ etat.fin }} · {{ etat.portee }} · {{ etat.jours_travail }} jour(s) de travail{% if etat.a_venir %} (jusqu'à aujourd'hui){% endif %}</span></div>
+    {% if etat.lignes %}<div style="display:flex;gap:8px;flex-wrap:wrap">
+      <a class="bouton second" target="_blank" href="/m/personnel/etats.pdf?debut={{ debut }}&amp;fin={{ fin }}&amp;cible={{ cible|urlencode }}&amp;detail=1">Imprimer avec le détail (PDF)</a>
+      <a class="bouton second" target="_blank" href="/m/personnel/etats.pdf?debut={{ debut }}&amp;fin={{ fin }}&amp;cible={{ cible|urlencode }}&amp;detail=0">Résumé seul (PDF)</a></div>{% endif %}
+  </div>
+  {% if etat.lignes %}
+  <div class="defile espace"><table class="tableau">
+    <tr><th>Agent</th><th class="nb">Jours</th><th class="nb">Présents</th><th class="nb">Retards</th><th class="nb">Min. de retard</th><th class="nb">Absents</th><th class="nb">Permissions</th><th class="nb">Congés</th><th class="nb">Non renseignés</th><th class="nb">Taux</th></tr>
+    {% for l in etat.lignes %}<tr><td>{{ l.nom_complet }}<br><span class="sous" style="margin:0;font-size:.78rem">{{ l.matricule }}{% if l.fonction %} · {{ l.fonction }}{% endif %}</span></td>
+      <td class="nb">{{ l.jours }}</td><td class="nb">{{ l.presents }}</td><td class="nb">{{ l.retards }}</td><td class="nb">{{ l.minutes }}</td><td class="nb">{{ l.absents }}</td><td class="nb">{{ l.permissions }}</td><td class="nb">{{ l.conges }}</td><td class="nb">{{ l.non_renseignes }}</td><td class="nb">{{ (l.taux ~ ' %') if l.taux is not none else '—' }}</td></tr>{% endfor %}
+    {% set t = etat.totaux %}
+    <tr class="total"><td>Total ({{ etat.lignes|length }} agent(s))</td><td class="nb">{{ t.jours }}</td><td class="nb">{{ t.presents }}</td><td class="nb">{{ t.retards }}</td><td class="nb">{{ t.minutes }}</td><td class="nb">{{ t.absents }}</td><td class="nb">{{ t.permissions }}</td><td class="nb">{{ t.conges }}</td><td class="nb">{{ t.non_renseignes }}</td><td class="nb">{{ (t.taux ~ ' %') if t.taux is not none else '—' }}</td></tr>
+  </table></div>
+  <p class="sous" style="font-size:.82rem;margin:8px 0 0">Taux de présence = (présents + retards) ÷ (jours de travail − permissions − congés). Un jour sans pointage ni autorisation reste « Non renseigné » : l'absence n'est jamais devinée.</p>
+  {% if etat.detail %}
+  <h3 style="margin:18px 0 6px;font-size:.98rem">Détail des retards et absences</h3>
+  <div class="defile"><table class="tableau"><tr><th>Date</th><th>Agent</th><th>Situation</th><th>Heure</th><th class="nb">Minutes</th><th>Motif</th></tr>
+    {% for e in etat.detail %}<tr><td>{{ e.jour }}</td><td>{{ e.nom_complet }}</td><td><span class="badge {{ e.statut|lower }}">{{ e.libelle }}</span></td><td>{{ e.heure }}</td><td class="nb">{{ e.minutes or '' }}</td><td>{{ e.motif }}</td></tr>{% endfor %}</table></div>
+  {% endif %}
+  {% if etat.autorisations %}
+  <h3 style="margin:18px 0 6px;font-size:.98rem">Permissions et congés de la période</h3>
+  <div class="defile"><table class="tableau"><tr><th>Agent</th><th>Type</th><th>Nature</th><th>Du</th><th>Au</th><th>Motif</th></tr>
+    {% for a in etat.autorisations %}<tr><td>{{ a.nom_complet }}</td><td>{{ a.libelle_type }}</td><td>{{ a.nature }}</td><td>{{ a.debut }}</td><td>{{ a.fin }}</td><td>{{ a.motif }}</td></tr>{% endfor %}</table></div>
+  {% endif %}
+  {% else %}<p class="sous espace" style="margin-bottom:0">Aucun agent concerné sur cette période.</p>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

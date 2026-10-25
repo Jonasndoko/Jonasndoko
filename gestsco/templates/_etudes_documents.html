@@ -1,0 +1,133 @@
+{# Préfecture > Documents scolaires officiels : préparer, soumettre à la signature ou à la validation, enregistrer la signature, imprimer. #}
+{% set d = docs %}
+{% if d.erreur %}<div class="erreur">{{ d.erreur }}</div>{% endif %}
+<div class="carte"><p class="sous" style="margin:0">Vous préparez les attestations de fréquentation, certificats de scolarité et autres documents autorisés par l'établissement, puis vous les <b>soumettez à la signature ou à la validation requise</b>. Quand elle est enregistrée, le document reçoit son numéro et son PDF devient officiel ; avant cela, il porte la mention « PROJET ».</p></div>
+<div class="espace"></div>
+
+{% if d.doc %}
+{% set x = d.doc %}
+<p style="margin:0 0 8px"><a class="lien" href="{{ url_for('etudes_sous_menu', sous='prefecture', f='documents', annee=x.annee) }}">&larr; Tous les documents</a></p>
+<div class="carte">
+  <h2 style="margin-top:0">{{ x.titre }}{% if x.numero %} · N° {{ x.numero }}{% endif %}</h2>
+  <p class="sous" style="margin:0 0 6px">{{ x.eleve }} ({{ x.matricule }}) · {{ x.classe }} · année {{ x.annee }}</p>
+  <p style="margin:0 0 10px"><b>{{ x.statut_libelle }}</b>
+    {% if x.statut == 'SOUMIS' %} · en attente de : {{ x.approbation_libelle }}{% if x.signataire %} ({{ x.signataire }}){% endif %} · soumis le {{ x.soumis_le }}{% endif %}
+    {% if x.statut == 'SIGNE' %} · {{ x.approbation_libelle }} : {{ x.signataire }} le {{ x.signe_le }}{% endif %}
+    {% if x.statut == 'ANNULE' %} · motif : {{ x.motif_annulation }}{% endif %}</p>
+  {% if x.motif_retour and x.statut == 'BROUILLON' %}<div class="erreur">Renvoyé en brouillon : {{ x.motif_retour }}</div>{% endif %}
+  {% if x.statut == 'BROUILLON' and d.peut_ajout %}
+  <form method="post" action="{{ url_for('etudes_document_action', action='modifier') }}">
+    <input type="hidden" name="doc" value="{{ x.id }}">
+    <label for="doc-texte">Texte du document</label>
+    <textarea id="doc-texte" name="contenu" rows="9" maxlength="1800" style="width:100%">{{ x.contenu }}</textarea>
+    <div class="ligne" style="margin-top:8px"><button type="submit" class="clair">Enregistrer le texte</button></div>
+  </form>
+  {% else %}
+  <div style="white-space:pre-wrap;border:1px solid #d6dbe6;border-radius:8px;padding:12px;background:#fafbfd">{{ x.contenu }}</div>
+  {% endif %}
+  <div class="ligne" style="margin-top:12px">
+    <a class="bouton clair" href="{{ url_for('etudes_document_pdf', id_doc=x.id) }}" target="_blank" rel="noopener">{{ 'Imprimer (PDF)' if x.statut == 'SIGNE' else 'Aperçu PDF (projet)' }}</a>
+  </div>
+</div>
+<div class="espace"></div>
+
+{% if x.statut == 'BROUILLON' and d.peut_modif %}
+<form method="post" action="{{ url_for('etudes_document_action', action='soumettre') }}" class="carte">
+  <h3 style="margin-top:0">Soumettre à la signature ou à la validation</h3>
+  <input type="hidden" name="doc" value="{{ x.id }}">
+  <div class="ligne">
+    <div style="flex:1;min-width:220px"><label for="d-appr">Approbation requise</label>
+      <select id="d-appr" name="approbation">{% for cle, lib in d.approbations %}<option value="{{ cle }}">{{ lib }}</option>{% endfor %}</select></div>
+    <div style="flex:1;min-width:200px"><label for="d-sig">Nom ou fonction du signataire (obligatoire pour une autre autorité)</label>
+      <input id="d-sig" type="text" name="signataire" maxlength="100"></div>
+    <button type="submit">Soumettre</button>
+  </div>
+</form>
+{% elif x.statut == 'SOUMIS' and d.peut_modif %}
+<div class="carte">
+  <h3 style="margin-top:0">Suite à donner</h3>
+  <form method="post" action="{{ url_for('etudes_document_action', action='signer') }}" style="margin-bottom:12px">
+    <input type="hidden" name="doc" value="{{ x.id }}">
+    <div class="ligne">
+      <div style="flex:1;min-width:220px"><label for="d-qui">Signé ou validé par</label>
+        <input id="d-qui" type="text" name="signataire" maxlength="100" value="{{ x.signataire }}" placeholder="Nom du signataire"></div>
+      <button type="submit">Enregistrer la signature ou la validation</button>
+    </div>
+  </form>
+  <form method="post" action="{{ url_for('etudes_document_action', action='renvoyer') }}" class="ligne">
+    <input type="hidden" name="doc" value="{{ x.id }}">
+    <input type="text" name="motif" maxlength="300" placeholder="Motif du renvoi en brouillon" aria-label="Motif du renvoi" style="flex:1;min-width:220px" required>
+    <button type="submit" class="clair">Renvoyer en brouillon</button>
+  </form>
+</div>
+<div class="espace"></div>
+{% endif %}
+{% if x.statut in ('SOUMIS', 'SIGNE') and d.peut_modif %}
+<form method="post" action="{{ url_for('etudes_document_action', action='annuler') }}" class="carte ligne" onsubmit="return confirm('Annuler ce document ?')">
+  <input type="hidden" name="doc" value="{{ x.id }}">
+  <input type="text" name="motif" maxlength="300" placeholder="Motif de l'annulation" aria-label="Motif de l'annulation" style="flex:1;min-width:220px" required>
+  <button type="submit" class="clair">Annuler le document</button>
+</form>
+{% endif %}
+
+{% elif d.liste %}
+{% set l = d.liste %}
+<form method="get" class="carte">
+  <input type="hidden" name="f" value="documents">
+  <div class="ligne">
+    <select name="annee" aria-label="Année scolaire" style="max-width:160px" onchange="this.form.submit()">
+      {% for a in l.annees %}<option value="{{ a }}" {{ 'selected' if a == l.annee else '' }}>{{ a }}</option>{% endfor %}
+    </select>
+    <select name="etat" aria-label="État"><option value="">Tous les états</option>
+      {% for cle, lib in l.etats %}<option value="{{ cle }}" {{ 'selected' if l.statut == cle else '' }}>{{ lib }}</option>{% endfor %}
+    </select>
+    <select name="type" aria-label="Type de document"><option value="">Tous les documents</option>
+      {% for t in l.types %}<option value="{{ t.cle }}" {{ 'selected' if l.type == t.cle else '' }}>{{ t.titre }}</option>{% endfor %}
+    </select>
+    <input type="search" name="q" value="{{ l.texte }}" placeholder="Élève, matricule ou numéro" aria-label="Rechercher">
+    <button type="submit">Filtrer</button>
+    {% if l.peut_ajout %}<a class="bouton" href="{{ url_for('etudes_sous_menu', sous='prefecture', f='documents', annee=l.annee, nouveau=1) }}">Préparer un document</a>{% endif %}
+  </div>
+</form>
+<div class="espace"></div>
+
+{% if d.nouveau and l.peut_ajout %}
+<form method="post" action="{{ url_for('etudes_document_action', action='preparer') }}" class="carte">
+  <h3 style="margin-top:0">Préparer un document ({{ l.annee }})</h3>
+  <input type="hidden" name="annee" value="{{ l.annee }}">
+  <div class="ligne">
+    <div style="flex:1;min-width:200px"><label for="n-type">Document</label>
+      <select id="n-type" name="type">{% for t in l.types %}<option value="{{ t.cle }}">{{ t.titre }}</option>{% endfor %}</select></div>
+    <div style="flex:1;min-width:220px"><label for="n-eleve">Élève (matricule)</label>
+      <input id="n-eleve" type="text" name="matricule" list="n-eleves" autocomplete="off" required placeholder="Matricule ou choisir dans la liste">
+      <datalist id="n-eleves">{% for e in d.eleves %}<option value="{{ e.matricule }}">{{ e.nom }} · {{ e.classe }}</option>{% endfor %}</datalist></div>
+    <button type="submit">Préparer le brouillon</button>
+  </div>
+  <p class="sous" style="margin:8px 0 0">Le texte est proposé d'après le dossier de l'élève ; vous pourrez le modifier avant de soumettre.</p>
+</form>
+<div class="espace"></div>
+{% endif %}
+
+<div class="chiffres">
+  {% for cle, lib in l.etats %}<div class="chiffre {{ 'vert' if cle == 'SIGNE' else '' }}"><b>{{ l.resume[cle] }}</b><span>{{ lib }}</span></div>{% endfor %}
+</div>
+<div class="espace"></div>
+<div class="carte defile">
+{% if l.documents %}
+<table class="tableau">
+  <thead><tr><th>Document</th><th>N°</th><th>Élève</th><th>Classe</th><th>État</th><th>Préparé le</th><th></th></tr></thead>
+  <tbody>
+  {% for x in l.documents %}
+  <tr>
+    <td>{{ x.titre }}</td><td>{{ x.numero or '-' }}</td><td>{{ x.eleve }}<br><span class="sous">{{ x.matricule }}</span></td><td>{{ x.classe }}</td>
+    <td>{{ x.statut_libelle }}{% if x.statut == 'SOUMIS' %}<br><span class="sous">{{ x.approbation_libelle }}</span>{% endif %}</td>
+    <td class="sous">{{ x.cree_le }}</td>
+    <td><a class="bouton clair" href="{{ url_for('etudes_sous_menu', sous='prefecture', f='documents', doc=x.id) }}">Ouvrir</a></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% if l.tronque %}<p class="sous">Seuls les premiers documents sont affichés : affinez les filtres.</p>{% endif %}
+{% else %}<p class="sous" style="margin:0">Aucun document pour cette sélection.</p>{% endif %}
+</div>
+{% endif %}

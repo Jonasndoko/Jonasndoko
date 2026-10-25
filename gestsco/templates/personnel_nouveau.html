@@ -1,0 +1,18 @@
+{% extends "personnel_base.html" %}
+{% block contenu %}
+<form class="carte" method="post" action="/m/personnel/nouveau" autocomplete="off">
+  <h2 style="margin:0 0 6px;font-size:1.05rem">Enregistrer un nouvel agent</h2>
+  <p class="sous" style="margin-bottom:6px">Les champs marqués d'une étoile sont obligatoires.</p>
+  {% set desactive = false %}
+  {% include "_personnel_champs_agent.html" %}
+  <div class="grille-form">
+    <div><label for="fonction" class="obligatoire">Fonction</label>
+      <input id="fonction" name="fonction" list="fonctions" value="{{ valeurs.fonction or '' }}" required maxlength="60">
+      <datalist id="fonctions">{% for f in propositions %}<option value="{{ f }}">{% endfor %}</datalist></div>
+    <div><label for="matricule">Matricule (facultatif)</label>
+      <input id="matricule" name="matricule" value="{{ valeurs.matricule or '' }}" maxlength="24" placeholder="Attribué automatiquement si vide"></div>
+  </div>
+  <p class="sous" style="margin:10px 0 0;font-size:.85rem">La fonction ne se change plus ici ensuite : elle change par une affectation (onglet « Affectations et historique »), pour garder l'historique.</p>
+  <div class="actions"><button type="submit">Enregistrer l'agent</button></div>
+</form>
+{% endblock %}

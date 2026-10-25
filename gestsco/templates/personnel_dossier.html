@@ -1,0 +1,64 @@
+{% extends "personnel_base.html" %}
+{% block contenu %}
+{% set action = '/m/personnel/dossier' %}
+{% include "_personnel_choix_agent.html" %}
+{% if agent %}
+<div class="carte espace">
+  <div class="ligne" style="justify-content:space-between">
+    <div><h2 style="margin:0;font-size:1.15rem">{{ agent.nom_complet }}
+        {% if not agent.actif %}<span class="badge inactif">Désactivé</span>{% endif %}</h2>
+      <span class="sous" style="margin:0">Matricule {{ agent.matricule }} · {{ agent.fonction }} · {{ agent.libelle_statut }}</span></div>
+    <a class="bouton second" target="_blank" href="/m/personnel/dossier/fiche.pdf?m={{ agent.matricule|urlencode }}">Imprimer la fiche (PDF)</a>
+  </div>
+  <p class="sous" style="margin:6px 0 0;font-size:.82rem">Enregistré le {{ agent.date_enreg }} par {{ agent.enregistre_par }}{% if agent.date_modif %} · modifié le {{ agent.date_modif }} par {{ agent.modifie_par }}{% endif %} · {{ agent.nb_documents }} document(s)</p>
+</div>
+
+<form class="carte espace" method="post" action="/m/personnel/dossier/modifier">
+  <input type="hidden" name="m" value="{{ agent.matricule }}">
+  <h2 style="margin:0 0 6px;font-size:1.05rem">Informations de l'agent</h2>
+  {% set desactive = not d.modif %}
+  {% include "_personnel_champs_agent.html" %}
+  <p class="sous" style="margin:8px 0 0;font-size:.85rem">Le matricule et la fonction ne se modifient pas ici (la fonction change par une affectation).</p>
+  {% if d.modif %}<div class="actions"><button type="submit">Enregistrer les modifications</button></div>
+  {% else %}<p class="alerte espace">Votre compte n'a pas le droit « Modification » : consultation seulement.</p>{% endif %}
+</form>
+
+{% if d.modif %}
+<form class="carte espace" method="post" action="/m/personnel/dossier/activite"
+      onsubmit="return confirm('{{ 'Réactiver' if not agent.actif else 'Désactiver' }} le dossier de cet agent ?')">
+  <input type="hidden" name="m" value="{{ agent.matricule }}"><input type="hidden" name="actif" value="{{ '1' if not agent.actif else '0' }}">
+  {% if agent.actif %}<p class="sous" style="margin:0 0 10px">Quand l'agent quitte l'école, on désactive son dossier : il n'est jamais supprimé.</p>
+  <button type="submit" class="danger">Désactiver le dossier</button>
+  {% else %}<button type="submit">Réactiver le dossier</button>{% endif %}
+</form>
+{% endif %}
+
+<div class="carte espace">
+  <h2 style="margin:0 0 10px;font-size:1.05rem">Documents numérisés</h2>
+  {% if docs %}
+  <div class="defile"><table class="tableau">
+    <tr><th>Type</th><th>Fichier</th><th>Format</th><th class="nb">Taille</th><th>Ajouté le</th><th></th></tr>
+    {% for x in docs %}
+    <tr><td>{{ x.type_doc }}</td><td>{{ x.nom_fichier }}</td><td>{{ x.format }}</td><td class="nb">{{ x.taille_txt }}</td>
+      <td>{{ x.date_ajout }} · {{ x.ajoute_par }}</td>
+      <td style="white-space:nowrap"><a class="bouton second petit" style="padding:6px 12px;font-size:.85rem" target="_blank" href="/m/personnel/dossier/document/{{ x.id_doc }}">Ouvrir</a>
+        {% if d.suppr %}<form method="post" action="/m/personnel/dossier/document/{{ x.id_doc }}/retirer" onsubmit="return confirm('Retirer ce document du dossier ?')"><button class="danger petit" type="submit">Retirer</button></form>{% endif %}</td></tr>
+    {% endfor %}
+  </table></div>
+  {% else %}<p class="sous" style="margin:0">Aucun document joint.</p>{% endif %}
+
+  {% if d.ajout %}
+  <form method="post" action="/m/personnel/dossier/document" enctype="multipart/form-data" class="espace">
+    <input type="hidden" name="m" value="{{ agent.matricule }}">
+    <div class="grille-form">
+      <div><label for="type_doc" class="obligatoire">Type de document</label>
+        <select id="type_doc" name="type_doc" required>{% for t in types_document %}<option>{{ t }}</option>{% endfor %}</select></div>
+      <div><label for="fichier" class="obligatoire">Fichier (PDF, JPEG ou PNG, {{ taille_max_mo }} Mo au plus)</label>
+        <input id="fichier" name="fichier" type="file" accept="application/pdf,image/jpeg,image/png" required></div>
+    </div>
+    <div class="actions" style="margin-top:10px"><button type="submit">Joindre le document</button></div>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

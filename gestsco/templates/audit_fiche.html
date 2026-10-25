@@ -1,0 +1,16 @@
+{% extends "audit_base.html" %}
+{% block contenu %}
+<p><a class="bouton second petit" href="{{ retour or url_for('audit_finances') }}">← Retour aux opérations</a></p>
+{% if t %}
+<div class="carte">
+  <h2 style="margin:0 0 10px;font-size:1.15rem">{{ t.titre }}</h2>
+  <dl class="infos">{% for libelle, valeur in t.champs %}<div><dt>{{ libelle }}</dt><dd>{{ valeur }}</dd></div>{% endfor %}</dl>
+</div>
+<div class="carte espace"><h2 style="margin:0 0 8px;font-size:1.05rem">Traces du journal</h2>
+  {% if not t.evenements %}<p class="sous" style="margin:0">Aucune trace au journal pour cette opération.</p>{% else %}
+  <div class="defile"><table class="tableau"><tr><th>Date et heure</th><th>Utilisateur</th><th>Action</th><th>Détail</th></tr>
+  {% for e in t.evenements %}<tr><td style="white-space:nowrap">{{ e.date_txt }}</td><td>{{ e.login or '—' }}{% if e.nom %}<br><span class="petit-texte">{{ e.nom }}</span>{% endif %}</td><td>{{ e.libelle }}</td><td class="ligne-detail">{{ e.detail }}</td></tr>{% endfor %}
+  </table></div>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

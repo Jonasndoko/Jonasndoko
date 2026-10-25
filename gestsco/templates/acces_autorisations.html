@@ -1,0 +1,31 @@
+{% extends "acces_base.html" %}
+{% block contenu %}
+<p class="sous">Choisissez un utilisateur, cochez ce qu'il peut faire dans chaque module, puis enregistrez. Le changement est immédiat, même s'il est connecté.</p>
+<div class="deux">
+  <div class="carte"><div class="defile"><table class="tableau">
+    <tr><th>Nom complet</th><th>Rôle</th><th>Sections</th><th>Autorisations</th><th></th></tr>
+    {% for c in comptes %}<tr class="{{ 'inactif' if not c.actif else '' }} {{ 'choisi' if courant and courant.id == c.id else '' }}">
+      <td>{{ c.nom }}<br><small class="sous">{{ c.login }}</small></td><td>{{ c.poste }}</td><td style="font-size:.82rem">{{ c.sections }}</td><td style="font-size:.78rem">{{ c.droits }}</td>
+      <td><a class="bouton second petit" href="{{ url_for('acces_autorisations', id=c.id) }}">Choisir</a></td></tr>{% endfor %}
+  </table></div></div>
+  <div class="carte">
+    {% if courant %}
+    <h2 style="margin:0 0 4px;font-size:1.1rem">Autorisations de {{ courant.nom }}</h2>
+    <p class="sous" style="margin:0 0 10px;font-size:.88rem">Rôle : {{ courant.poste }} · identifiant : {{ courant.login }}<br>Travaux techniques et Gestionnaire d'accès : {{ 'accès accordé' if courant.admin else 'accès non accordé' }} (selon le rôle)</p>
+    <form method="post" action="{{ url_for('acces_autorisations_enregistrer') }}">
+      <input type="hidden" name="id" value="{{ courant.id }}">
+      {% include "_acces_matrice.html" %}
+      <h3 style="margin:12px 0 0;font-size:.95rem">Sections de l'école ouvertes à ce compte</h3>
+      {% for k, lib, coche in sections %}<label class="case-ligne"><input type="checkbox" name="s" value="{{ k }}" {{ 'checked' if coche else '' }}> {{ lib }}</label>{% endfor %}
+      <p class="note">Le compte ne voit que les élèves, classes, paiements et inscriptions des sections cochées. Il n'y a pas de carte d'élève au primaire.</p>
+      <div class="actions"><button type="submit">Enregistrer les autorisations</button></div>
+    </form>
+    <form method="post" action="{{ url_for('acces_autorisations_defaut') }}" onsubmit="return confirm('Rétablir les droits de base du rôle « {{ courant.poste|replace("'", "’") }} » pour {{ courant.nom|replace("'", "’") }} ?\nSes autorisations personnelles seront remplacées.')" style="margin-top:10px">
+      <input type="hidden" name="id" value="{{ courant.id }}"><button class="second" type="submit">Rétablir les droits de base de son rôle</button>
+    </form>
+    {% else %}
+    <p class="sous" style="margin:0">Choisissez un utilisateur dans la liste.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

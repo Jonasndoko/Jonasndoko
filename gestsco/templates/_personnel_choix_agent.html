@@ -1,0 +1,23 @@
+{# Recherche et choix d'un agent. Variables : action (adresse de la page), q, agents, agent #}
+<form class="carte" method="get" action="{{ action }}">
+  <label for="q">Matricule, nom, fonction ou téléphone de l'agent</label>
+  <div class="ligne">
+    <input id="q" name="q" value="{{ q }}" autocomplete="off">
+    <button type="submit">Rechercher</button>
+  </div>
+</form>
+{% if agents %}
+<div class="carte espace">
+  <p class="sous" style="margin-bottom:8px">{{ agents|length }} agent(s){% if agents|length >= 300 %} (300 premiers : affinez la recherche){% endif %} : choisissez l'agent.</p>
+  <div class="defile" style="max-height:300px;overflow-y:auto"><table class="tableau">
+    <tr><th>Matricule</th><th>Nom complet</th><th>Fonction</th><th>Statut</th><th></th></tr>
+    {% for a in agents %}
+    <tr {% if agent and agent.matricule == a.matricule %}style="background:var(--fond)"{% endif %}>
+      <td><a class="lien" href="{{ action }}?m={{ a.matricule|urlencode }}{% if q %}&amp;q={{ q|urlencode }}{% endif %}">{{ a.matricule }}</a></td>
+      <td>{{ a.nom_complet }}</td><td>{{ a.fonction }}</td><td>{{ a.libelle_statut }}</td>
+      <td>{% if not a.actif %}<span class="badge inactif">Désactivé</span>{% endif %}</td>
+    </tr>{% endfor %}
+  </table></div>
+</div>
+{% elif q %}<div class="alerte espace" role="status">Aucun agent trouvé pour « {{ q }} ».</div>
+{% endif %}

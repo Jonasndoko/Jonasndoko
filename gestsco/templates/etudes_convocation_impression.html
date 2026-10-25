@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Convocation n° {{ v.id }} · {{ cfg.NOM_ECOLE }}</title>
+<style>
+@page{size:A4 portrait;margin:18mm}
+*{box-sizing:border-box}
+body{margin:0;padding:16px;font-family:"Segoe UI",system-ui,sans-serif;color:#16213E;background:#fff;font-size:1rem}
+.actions{max-width:640px;margin:0 auto 14px;display:flex;gap:8px}
+.actions button{background:#1D4ED8;color:#fff;border:0;border-radius:8px;padding:8px 16px;font:inherit;cursor:pointer}
+.feuille{max-width:640px;margin:0 auto}
+.ecole{text-align:center;font-weight:700;font-size:1.3rem;margin:0}
+.service{text-align:center;color:#5A6785;margin:2px 0 14px}
+h1{text-align:center;font-size:1.5rem;margin:8px 0 18px;padding-bottom:14px;border-bottom:1px solid #8A97B5}
+p{margin:10px 0;line-height:1.5}
+.sign{margin-top:48px;text-align:right}
+.annulee{border:2px solid #B3261E;color:#B3261E;text-align:center;font-weight:700;padding:6px;margin-bottom:14px}
+.pied{margin-top:36px;font-size:.78rem;color:#5A6785}
+@media print{.actions{display:none}body{padding:0}}
+</style>
+</head>
+<body>
+<div class="actions"><button type="button" onclick="window.print()">Imprimer</button></div>
+<div class="feuille">
+{% set l = v.lettre %}
+{% if v.statut == 'ANNULEE' %}<div class="annulee">CONVOCATION ANNULÉE</div>{% elif v.statut == 'BROUILLON' %}<div class="annulee" style="border-color:#8A97B5;color:#5A6785">PROJET : non envoyée</div>{% endif %}
+<p class="ecole">{{ l.ecole }}</p><p class="service">{{ l.service }}</p>
+<h1>{{ l.titre }}</h1>
+{% for nom, val in l.lignes %}<p><b>{{ nom }} :</b> {{ val }}</p>{% endfor %}
+{% if l.instructions %}<p><b>Instructions :</b> {{ l.instructions }}</p>{% endif %}
+<p style="margin-top:22px">{{ l.texte }}</p>
+<p class="sign">{{ l.signature }}</p>
+<p class="pied">Convocation n° {{ v.id }} · établie le {{ v.le }} · imprimée le {{ aujourdhui }}</p>
+</div>
+</body>
+</html>

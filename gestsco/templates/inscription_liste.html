@@ -1,0 +1,25 @@
+{% extends "inscription_base.html" %}
+{% block contenu %}
+<form class="carte" method="get" action="/m/inscription/liste">
+  <div class="ligne">
+    <div style="flex:1;min-width:200px"><label for="classe">Classe</label>
+      <select id="classe" name="classe"><option value="">Toutes les classes</option>
+        {% for n, libelle in classes %}<option value="{{ n }}" {{ 'selected' if n_classe == n else '' }}>{{ libelle }}</option>{% endfor %}
+      </select></div>
+    <div style="flex:1;min-width:200px"><label for="q">Recherche (nom, N° de candidat, reçu)</label><input id="q" name="q" value="{{ recherche }}" autocomplete="off"></div>
+    <div style="align-self:end"><button type="submit">Afficher</button></div>
+  </div>
+</form>
+{% if erreur %}<div class="erreur espace" role="alert">{{ erreur }}</div>{% endif %}
+<p class="sous espace">{% if annee %}{{ liste|length }} candidat(s) en attente - année {{ annee }}{% else %}Aucune année scolaire n'est définie.{% endif %}</p>
+{% if liste %}
+<div class="carte"><div class="defile"><table class="tableau">
+  <tr><th class="nb">Rang</th><th>N° candidat</th><th>Nom</th><th>Classe</th><th>Ancienne école</th><th class="nb">%</th><th>Doublant</th><th>Reçu</th><th>Enregistré le</th><th></th></tr>
+  {% for c in liste %}
+  <tr><td class="nb">{{ c.rang }}</td><td>{{ c.num_cand }}</td><td>{{ c.nom_complet }}</td><td>{{ c.classe }}</td><td>{{ c.ecole_origine }}</td>
+    <td class="nb">{{ c.pourcent_origine }}</td><td>{{ 'Oui' if c.doublant else 'Non' }}</td><td>{{ c.n_recu }}</td><td>{{ c.date_enreg }}</td>
+    <td><a target="_blank" rel="noopener" class="lien" href="{{ url_for('inscription_fiche_pdf', n_cand=c.n_cand) }}">Fiche (PDF)</a></td></tr>
+  {% endfor %}
+</table></div></div>
+{% endif %}
+{% endblock %}

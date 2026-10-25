@@ -1,0 +1,23 @@
+{% extends "audit_base.html" %}
+{% block contenu %}
+<p class="sous">Le journal est en ajout seulement : chaque ligne contient l'empreinte de la précédente, donc toute modification ou suppression après coup se voit. La concordance compare le journal et les tables financières (reçus, annulations, encaissements) pour repérer ce qui a été fait en dehors de l'application.</p>
+<div class="actions" style="margin:0 0 14px">
+  <form method="post" action="{{ url_for('audit_controle_journal') }}"><button type="submit">Vérifier l'intégrité du journal</button></form>
+  <form method="post" action="{{ url_for('audit_controle_concordance') }}"><button class="second" type="submit">Contrôler la concordance</button></form>
+</div>
+<div class="carte">
+{% if journal %}
+  <h2 style="margin:0 0 8px;font-size:1.1rem">Intégrité du journal</h2>
+  {% if journal.ok %}<p class="vert">✔ La chaîne d'empreintes est intacte : aucune ligne n'a été modifiée ni supprimée.</p>
+  {% else %}<p class="rouge">✘ ANOMALIE : le journal a été modifié à partir de la ligne {{ journal.anomalie }}. Prévenez le responsable : ne restaurez rien avant d'avoir fait une copie du fichier de base de données.</p>{% endif %}
+  <p>Lignes du journal : {{ journal.nb_lignes }}{% if journal.nb_lignes %}<br>Période couverte : du {{ journal.debut }} au {{ journal.fin }}{% endif %}</p>
+  <p class="petit-texte">Dernière empreinte : <code style="word-break:break-all">{{ journal.derniere_empreinte }}</code><br>Notez-la ou imprimez un rapport : elle prouvera plus tard que le journal n'a pas été réécrit.</p>
+{% elif concordance is not none %}
+  <h2 style="margin:0 0 8px;font-size:1.1rem">Concordance entre le journal et les tables financières</h2>
+  {% if not concordance %}<p class="vert">✔ Tout concorde : chaque reçu, annulation et encaissement a sa trace au journal.</p>
+  {% else %}<p class="orange">⚠ {{ concordance|length }} point(s) à vérifier :</p>
+  <ul>{% for a in concordance %}<li><span class="{{ 'rouge' if a.gravite == 'ÉLEVÉE' else 'orange' }}">[{{ a.gravite }}]</span> {{ a.message }}</li>{% endfor %}</ul>
+  <p class="petit-texte">Une anomalie n'est pas une preuve de fraude : elle indique où regarder.</p>{% endif %}
+{% else %}<p class="sous" style="margin:0">Choisissez un contrôle ci-dessus.</p>{% endif %}
+</div>
+{% endblock %}

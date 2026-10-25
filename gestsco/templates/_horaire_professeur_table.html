@@ -1,0 +1,12 @@
+<table class="hor" style="margin-top:8px">
+  <thead><tr><th class="cr">Heure</th>{% for j in p.jours %}<th>{{ j.nom }}</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for l in p.lignes %}
+  <tr><th class="cr">{{ l.debut }} – {{ l.fin }}</th>
+    {% for j in p.jours %}<td class="cel {{ 'pris' if l.cases.get(j.index) else '' }} {{ 'conflit' if l.cases.get(j.index) and l.cases.get(j.index)[0].conflit else '' }}" style="height:auto">
+      {% for x in l.cases.get(j.index, []) %}<b>{{ x.classe }}</b><small>{{ x.cours }}{% if not x.publie %} (brouillon){% endif %}</small>{% endfor %}</td>{% endfor %}
+  </tr>
+  {% else %}<tr><td colspan="{{ p.jours|length + 1 }}" class="sous">Aucun cours placé dans l'horaire pour le moment.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>

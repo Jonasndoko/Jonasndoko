@@ -1,0 +1,31 @@
+{% extends "audit_base.html" %}
+{% from "_audit_macros.html" import date, texte, choix, exporter %}
+{% block contenu %}
+<p class="sous">Retrouvez des traces du journal par utilisateur, période, module, type d'action, n° de reçu ou matricule de l'élève. Une recherche sur un reçu ou un élève est elle-même inscrite au journal.</p>
+<form method="get" class="filtres" action="{{ url_for('audit_recherche_page') }}">
+  <div class="grille-f">
+    {{ choix('u', 'Utilisateur', utilisateurs, v.u, 'Tous les utilisateurs') }}
+    {{ choix('module', 'Module concerné', modules_traces.items(), v.module, 'Tous les modules') }}
+    <div><label for="f-action">Type d'action</label>
+      <select id="f-action" name="action"><option value="">Tous les types d'action</option>
+        {% for titre, lst in groupes %}<optgroup label="{{ titre }}">{% for code, lib in lst %}<option value="{{ code }}" {{ 'selected' if code == v.action else '' }}>{{ lib }}</option>{% endfor %}</optgroup>{% endfor %}
+      </select></div>
+    {{ date('du', 'Du', v.du) }}{{ date('au', 'Au', v.au) }}
+    {{ texte('recu', 'N° de reçu', v.recu) }}{{ texte('eleve', "Matricule de l'élève", v.eleve) }}{{ texte('texte', 'Texte', v.texte) }}
+  </div>
+  <div class="actions">
+    <button type="submit">Rechercher</button><a class="bouton second" href="{{ url_for('audit_recherche_page') }}">Réinitialiser</a>
+    <span style="flex:1"></span>{{ exporter('traces', q) }}
+  </div>
+</form>
+{% if r %}
+{% if filtres_txt %}<div class="petit-texte">Filtres : {{ filtres_txt|join(' · ') }}</div>{% endif %}
+<div class="resume">{% if r.total %}{{ r.total }} trace(s) trouvée(s){% else %}Aucune trace trouvée{% endif %}{% if r.total > r.lignes|length %} — les {{ r.lignes|length }} plus récentes sont affichées : exportez pour tout obtenir{% endif %}</div>
+<div class="carte"><div class="defile"><table class="tableau">
+  <tr><th>Date et heure</th><th>Utilisateur</th><th>Module</th><th>Action</th><th>N° reçu</th><th>Matricule</th><th>Détail</th></tr>
+  {% for l in r.lignes %}<tr><td style="white-space:nowrap">{{ l.date_txt }}</td><td>{{ l.login or '—' }}{% if l.nom %}<br><span class="petit-texte">{{ l.nom }}</span>{% endif %}</td>
+    <td>{{ l.module_txt }}</td><td>{{ l.libelle }}</td><td>{{ l.n_recu or '—' }}</td><td>{{ l.matricule or '—' }}</td><td class="ligne-detail">{{ l.detail }}</td></tr>
+  {% else %}<tr><td colspan="7" class="sous">Aucune trace.</td></tr>{% endfor %}
+</table></div></div>
+{% endif %}
+{% endblock %}

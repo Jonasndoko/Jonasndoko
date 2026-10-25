@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block titre %}Premier démarrage{% endblock %}
+{% block corps %}
+<form class="carte form" method="post" action="/installation">
+  <h1>Premier démarrage</h1>
+  <p class="sous">Créez le compte Administrateur. Cette page disparaît dès qu'il existe.</p>
+  {% if not code_requis %}<div class="erreur">Le code d'installation n'est pas défini sur le serveur (variable GESTISC_CODE_INSTALL) : la création est bloquée.</div>{% endif %}
+  {% if erreur %}<div class="erreur" role="alert">{{ erreur }}</div>{% endif %}
+  <label for="code">Code d'installation</label><input id="code" name="code" type="password" required>
+  <label for="nom">Nom complet</label><input id="nom" name="nom" required>
+  <label for="login">Identifiant</label><input id="login" name="login" autocapitalize="none" required>
+  <label for="mdp">Mot de passe</label><input id="mdp" name="mdp" type="password" autocomplete="new-password" required>
+  <label for="confirmation">Confirmer le mot de passe</label><input id="confirmation" name="confirmation" type="password" autocomplete="new-password" required>
+  <button class="plein" type="submit">Créer l'Administrateur</button>
+</form>
+{% endblock %}

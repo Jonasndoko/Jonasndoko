@@ -1,0 +1,35 @@
+{% extends "travaux_base.html" %}
+{% block contenu %}
+<p class="sous">Ajoutez, corrigez, désactivez ou supprimez les données de base de l'école. Une donnée utilisée ailleurs ne se supprime pas sans confirmation : on vous montre d'abord ce qui en dépend. Chaque opération est inscrite au journal.</p>
+<nav class="tables" aria-label="Tables">{% for x in tables %}<a href="{{ url_for('travaux_tables', t=x.cle) }}" class="{{ 'actif' if x.cle == t.cle else '' }}">{{ x.titre }}</a>{% endfor %}</nav>
+<div class="carte">
+  <h2 style="margin:0 0 4px;font-size:1.15rem">{{ t.titre }}</h2>
+  <p class="sous" style="margin:0 0 12px">{{ t.aide }}</p>
+  <form method="get" action="{{ url_for('travaux_tables') }}" class="ligne" style="margin-bottom:12px">
+    <input type="hidden" name="t" value="{{ t.cle }}">
+    <input type="search" name="q" value="{{ q }}" placeholder="Rechercher…" aria-label="Rechercher" maxlength="60">
+    <button class="second" type="submit">Rechercher</button>
+    {% if t.peut_creer %}<a class="bouton" href="{{ url_for('travaux_nouveau', t=t.cle) }}">Ajouter</a>{% endif %}
+  </form>
+  <div class="defile"><table class="tableau">
+    <tr>{% for titre, largeur, ancre in colonnes %}<th>{{ titre }}</th>{% endfor %}<th>Actions</th></tr>
+    {% for l in lignes %}
+    <tr class="{{ 'inactif' if l.actif is false else '' }}">
+      {% for v in l.valeurs %}<td>{{ v }}</td>{% endfor %}
+      <td style="white-space:nowrap">
+        {% if t.peut_modifier %}<a class="bouton second petit" href="{{ url_for('travaux_modifier', t=t.cle, k=l.k) }}">Modifier</a>{% endif %}
+        {% if t.peut_desactiver and l.actif is not none %}
+        <form method="post" action="{{ url_for('travaux_etat') }}" {% if l.actif %}onsubmit="return confirm('Désactiver « {{ l.nom|replace("'", "’") }} » ? Elle ne sera plus proposée dans les listes ; l\'historique est conservé.')"{% endif %}>
+          <input type="hidden" name="t" value="{{ t.cle }}"><input type="hidden" name="k" value="{{ l.k }}"><input type="hidden" name="action" value="{{ 'desactiver' if l.actif else 'reactiver' }}">
+          <button class="second petit" type="submit">{{ 'Désactiver' if l.actif else 'Réactiver' }}</button></form>{% endif %}
+        {% if t.peut_annuler and l.actif %}<a class="bouton danger petit" href="{{ url_for('travaux_annuler_recu', k=l.k) }}">Annuler le reçu</a>{% endif %}
+        {% if t.peut_supprimer %}
+        <form method="post" action="{{ url_for('travaux_supprimer') }}" onsubmit="return confirm('Supprimer définitivement « {{ l.nom|replace("'", "’") }} » ?\nSi la donnée est utilisée ailleurs, on vous proposera de supprimer aussi les données liées.')">
+          <input type="hidden" name="t" value="{{ t.cle }}"><input type="hidden" name="k" value="{{ l.k }}"><button class="danger petit" type="submit">Supprimer</button></form>{% endif %}
+      </td>
+    </tr>
+    {% else %}<tr><td colspan="{{ colonnes|length + 1 }}" class="sous">Aucun élément.</td></tr>{% endfor %}
+  </table></div>
+  <p class="sous" style="margin:10px 0 0">{{ total }} élément(s){% if inactifs %} · {{ inactifs }} désactivé(s) (en gris){% endif %}{% if tronque %} · seuls les {{ limite }} premiers sont affichés : affinez la recherche{% endif %}</p>
+</div>
+{% endblock %}

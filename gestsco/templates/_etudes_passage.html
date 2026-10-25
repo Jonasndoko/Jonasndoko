@@ -1,0 +1,176 @@
+{# Passage en classe supérieure (promotion.py) : Directrice des études. Lecture = consulter ; Ajout = choisir la classe d'accueil et exécuter ; Modification = annuler. #}
+<style>
+.pa-filtre{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:end;margin:0 0 12px}
+.pa-filtre>div{display:flex;flex-direction:column;gap:2px}.pa-filtre label{margin:0;font-size:.8rem;color:var(--gris)}
+.pa-filtre select{width:auto;padding:7px 9px}
+.pa-chiffres{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:0 0 14px}
+.pa-chiffre{background:var(--carte);border:1px solid var(--bord);border-radius:10px;padding:10px 14px}
+.pa-chiffre b{display:block;font-size:1.3rem;line-height:1.2}.pa-chiffre span{font-size:.78rem;color:var(--gris)}
+.pa-sec{margin:18px 0 6px;font-size:1.02rem}
+.pa-note{font-size:.85rem;color:var(--gris);margin:0 0 8px}
+.pa-tag{display:inline-block;font-size:.75rem;font-weight:600;border-radius:99px;padding:1px 9px}
+.pa-tag.monte{background:#DDF3E3;color:#1E6B30}.pa-tag.redouble{background:#FDF0DC;color:#8A5300}.pa-tag.fin{background:#E3E9FB;color:#1D3A8A}.pa-tag.attente{background:#EEE;color:#555}
+.pa-tableau select{width:auto;max-width:15rem;padding:6px 8px}
+.pa-tableau td .sous{font-size:.78rem;margin:2px 0 0}
+</style>
+{% set P = pa %}
+{% if P.erreur %}<div class="erreur">{{ P.erreur }}</div>{% endif %}
+<div class="carte"><p class="sous" style="margin:0">
+À la fin de l'année, affectez les élèves à leur classe de l'année suivante : les élèves qui ont <b>réussi</b> (résultat annuel « ADMIS(E) ») montent dans la classe supérieure ; ceux qui ont <b>échoué</b> restent dans la même classe (redoublants) ; ceux dont le résultat est « en attente » ne sont pas traités. Pour la <b>8ème</b>, vous saisissez à la place de chaque élève l'option qu'il a choisie : elle détermine sa classe de 1ère humanités.
+</p></div>
+<div class="espace"></div>
+
+<form method="get" class="pa-filtre" aria-label="Année qui se termine">
+  <input type="hidden" name="f" value="passage">
+  <div><label for="pa-annee">Année qui se termine</label>
+    <select id="pa-annee" name="annee" onchange="this.form.submit()">{% for a in P.annees %}<option value="{{ a }}" {{ 'selected' if a == P.annee else '' }}>{{ a }}</option>{% endfor %}</select></div>
+  <div><button type="submit" class="second">Afficher</button></div>
+</form>
+
+{# ======================================================== vue d'ensemble #}
+{% if P.apercu %}
+{% set A = P.apercu %}
+{% if A.avertissement %}<div class="alerte">{{ A.avertissement }}</div>{% else %}
+<p class="pa-note">Année d'accueil : <b>{{ A.annee_dest }}</b>.</p>{% endif %}
+<div class="pa-chiffres">
+  <div class="pa-chiffre"><b>{{ A.total.effectif }}</b><span>Élèves</span></div>
+  <div class="pa-chiffre"><b>{{ A.total.promus }}</b><span>À faire monter</span></div>
+  <div class="pa-chiffre"><b>{{ A.total.redoublants }}</b><span>À faire redoubler</span></div>
+  <div class="pa-chiffre"><b>{{ A.total.termines }}</b><span>Fin d'études</span></div>
+  <div class="pa-chiffre"><b>{{ A.total.attente }}</b><span>Résultat en attente</span></div>
+  <div class="pa-chiffre"><b>{{ A.total.faits }}</b><span>Déjà traités</span></div>
+</div>
+<div class="carte defile">
+{% if A.classes %}
+<table class="tableau"><thead><tr><th>Classe</th><th>Passage</th><th class="nb">Élèves</th><th class="nb">Montent</th><th class="nb">Redoublent</th><th class="nb">Fin d'études</th>
+  <th class="nb">En attente</th><th class="nb">Classe à choisir</th><th class="nb">Déjà traités</th><th></th></tr></thead><tbody>
+{% for k in A.classes %}
+<tr><td>{{ k.designation }}{% if k.option %}<div class="sous" style="font-size:.78rem;margin:0">{{ k.option }}</div>{% endif %}{% if not k.actif %}<div class="sous" style="font-size:.78rem;margin:0">Classe désactivée</div>{% endif %}</td>
+  <td>{{ k.etape }}</td><td class="nb">{{ k.effectif }}</td><td class="nb">{{ k.promus }}</td><td class="nb">{{ k.redoublants }}</td><td class="nb">{{ k.termines }}</td>
+  <td class="nb">{{ k.attente }}</td><td class="nb">{% if k.a_choisir %}<b style="color:var(--rouge)">{{ k.a_choisir }}</b>{% else %}0{% endif %}</td><td class="nb">{{ k.faits }}{% if k.deja %} (+{{ k.deja }} déjà inscrits){% endif %}</td>
+  <td><a class="lien" href="{{ url_for('etudes_sous_menu', sous='direction_etudes', f='passage', annee=A.annee, classe=k.n_classe) }}">Ouvrir</a></td></tr>
+{% endfor %}
+</tbody></table>
+{% else %}<p class="sous" style="margin:0">Aucune classe du secondaire n'avait d'élève inscrit en {{ A.annee }}.</p>{% endif %}
+</div>
+{% endif %}
+
+{# ======================================================== une classe #}
+{% if P.detail %}
+{% set D = P.detail %}
+{% set R = D.resume %}
+{% set ouvert = D.annee_dest and D.peut_ajout %}
+{% macro champs() %}<input type="hidden" name="annee" value="{{ D.annee }}"><input type="hidden" name="classe" value="{{ D.classe.n_classe }}">{% endmacro %}
+<p style="margin:0 0 8px"><a class="lien" href="{{ url_for('etudes_sous_menu', sous='direction_etudes', f='passage', annee=D.annee) }}">← Toutes les classes</a></p>
+<h3 class="pa-sec" style="margin-top:4px">{{ D.classe.designation }}{% if D.classe.option %} · {{ D.classe.option }}{% endif %} · {{ D.annee }}{% if D.annee_dest %} → {{ D.annee_dest }}{% endif %}</h3>
+<p class="pa-note">{{ D.etape }}.</p>
+{% if not D.annee_dest %}<div class="alerte">L'année scolaire qui suit {{ D.annee }} n'est pas encore créée : vous pouvez consulter les résultats, mais pas exécuter le passage (Direction des études > Années).</div>{% endif %}
+<div class="pa-chiffres">
+  <div class="pa-chiffre"><b>{{ R.effectif }}</b><span>Élèves</span></div>
+  <div class="pa-chiffre"><b>{{ R.promus }}</b><span>Montent</span></div>
+  <div class="pa-chiffre"><b>{{ R.redoublants }}</b><span>Redoublent</span></div>
+  {% if D.fin %}<div class="pa-chiffre"><b>{{ R.termines }}</b><span>Fin d'études</span></div>{% endif %}
+  <div class="pa-chiffre"><b>{{ R.attente }}</b><span>Résultat en attente</span></div>
+  <div class="pa-chiffre"><b>{{ R.faits }}</b><span>Déjà traités</span></div>
+</div>
+<p style="margin:0 0 10px" class="ligne">
+  <a class="bouton second" target="_blank" rel="noopener" href="{{ url_for('etudes_passage_impression', annee=D.annee, classe=D.classe.n_classe) }}">Imprimer la liste</a>
+  <a class="bouton second" href="{{ url_for('etudes_passage_csv', annee=D.annee, classe=D.classe.n_classe) }}">Exporter (CSV)</a>
+</p>
+{% if R.a_choisir %}<div class="alerte">{{ R.a_choisir }} élève(s) qui réussissent n'ont pas encore de classe d'accueil{% if D.choix_option %} : saisissez leur <b>option</b> ci-dessous avant d'exécuter le passage{% endif %}.</div>{% endif %}
+{% if D.peut_ajout and not D.destinations and not D.fin %}<div class="alerte">Aucune classe d'accueil n'est ouverte pour cette classe : créez-la (Travaux techniques > Mise à jour des tables > Classes).</div>{% endif %}
+
+{% macro choix_options(x) %}
+{% if D.destinations | selectattr('option') | list %}
+  {% for opt in D.destinations | map(attribute='option') | unique %}
+  <optgroup label="{{ ('Option ' ~ opt) if opt else 'Sans option' }}">
+    {% for c in D.destinations if c.option == opt %}<option value="{{ c.n_classe }}" {{ 'selected' if x.dest_id == c.n_classe else '' }}>{{ c.designation }}</option>{% endfor %}
+  </optgroup>
+  {% endfor %}
+{% else %}
+  {% for c in D.destinations %}<option value="{{ c.n_classe }}" {{ 'selected' if x.dest_id == c.n_classe else '' }}>{{ c.designation }}</option>{% endfor %}
+{% endif %}
+{% endmacro %}
+
+{% set sans_choix = D.eleves | selectattr('peut_choisir') | rejectattr('choisi') | list %}
+{% if ouvert and D.destinations and sans_choix %}
+<form method="post" action="{{ url_for('etudes_passage_action', action='choix_tous') }}" class="carte" style="margin:0 0 12px">
+  {{ champs() }}
+  <div class="ligne">
+    <label for="pa-tous" style="margin:0">{{ 'Même option (classe) pour tous les élèves sans choix' if D.choix_option else 'Même classe d\'accueil pour tous les élèves sans choix' }}</label>
+    <select id="pa-tous" name="dest_tous" required style="max-width:18rem;flex:0 1 auto"><option value="">Choisir…</option>{{ choix_options({'dest_id': None}) }}</select>
+    <button type="submit" class="second">Appliquer</button>
+  </div>
+</form>
+{% endif %}
+
+{% set peut_choisir_une = ouvert and D.eleves | selectattr('peut_choisir') | list %}
+{% if peut_choisir_une %}<form id="pa-choix" method="post" action="{{ url_for('etudes_passage_action', action='choix') }}">{{ champs() }}</form>{% endif %}
+{% if D.peut_modification and R.faits %}<form id="pa-ann" method="post" action="{{ url_for('etudes_passage_action', action='annuler') }}">{{ champs() }}</form>{% endif %}
+<div class="carte defile pa-tableau">
+<table class="tableau">
+  <thead><tr>{% if D.peut_modification and R.faits %}<th></th>{% endif %}<th>Élève</th><th class="nb">%</th><th>Résultat de l'année</th><th>Décision</th>
+    <th>{{ 'Option choisie (classe d\'accueil)' if D.choix_option else 'Classe d\'accueil' }}</th><th>Situation</th></tr></thead>
+  <tbody>
+  {% for x in D.eleves %}
+  <tr>
+    {% if D.peut_modification and R.faits %}<td>{% if x.fait %}<input type="checkbox" name="matricule" value="{{ x.matricule }}" form="pa-ann" aria-label="Choisir {{ x.nom_complet }}">{% endif %}</td>{% endif %}
+    <td>{{ x.nom_complet }}<div class="sous">{{ x.matricule }}</div></td>
+    <td class="nb">{{ ('%.1f' % x.pct) if x.pct is not none else '-' }}</td>
+    <td>{{ x.resultat }}</td>
+    <td>{% if x.decision == 'PROMU' %}<span class="pa-tag monte">Monte</span>{% elif x.decision == 'REDOUBLE' %}<span class="pa-tag redouble">Redouble</span>
+        {% elif x.decision == 'TERMINE' %}<span class="pa-tag fin">Fin d'études</span>{% else %}<span class="pa-tag attente">En attente</span>{% endif %}</td>
+    <td>
+      {% if peut_choisir_une and x.peut_choisir %}
+        <select name="dest_{{ x.matricule }}" form="pa-choix" aria-label="Classe d'accueil de {{ x.nom_complet }}">
+          <option value="">{{ 'Choisir l\'option…' if D.choix_option else 'Choisir…' }}</option>{{ choix_options(x) }}
+        </select>
+      {% elif x.dest %}{{ x.dest }}{% if x.dest_option %}<div class="sous">Option {{ x.dest_option }}</div>{% endif %}
+      {% elif x.decision == 'TERMINE' %}-{% else %}<span class="sous" style="margin:0">À choisir</span>{% endif %}
+    </td>
+    <td>{% if x.fait %}<b>{{ {'PROMU': 'Passage fait', 'REDOUBLE': 'Redoublement enregistré', 'TERMINE': 'Fin des études enregistrée'}[x.decision] }}</b>
+        {% elif x.deja_inscrit %}Déjà inscrit en {{ D.annee_dest }} ({{ x.deja_inscrit }})
+        {% elif x.bloque %}<span style="color:var(--rouge)">{{ x.bloque }}</span>
+        {% elif x.decision == 'ATTENTE' %}Résultat en attente{% else %}À traiter{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% if peut_choisir_une %}
+<div class="espace"></div>
+<button type="submit" form="pa-choix">{{ 'Enregistrer les options choisies' if D.choix_option else 'Enregistrer les classes d\'accueil' }}</button>
+{% endif %}
+
+{% if ouvert %}
+<div class="espace"></div>
+<form method="post" action="{{ url_for('etudes_passage_action', action='executer') }}" class="carte"
+      onsubmit="return confirm('Exécuter le passage de {{ D.classe.designation }} ? {{ R.promus }} élève(s) montent, {{ R.redoublants }} redoublent{% if R.termines %}, {{ R.termines }} terminent leurs études{% endif %}. Ils seront inscrits en {{ D.annee_dest }}.');">
+  {{ champs() }}
+  <h2 style="margin:0 0 8px;font-size:1.05rem">Exécuter le passage</h2>
+  {% if R.a_faire %}
+  <p style="margin:0 0 8px">{{ R.promus }} élève(s) montent{% if D.destinations and not D.choix_option %} dans leur classe d'accueil{% endif %}, {{ R.redoublants }} redoublent dans {{ D.classe.designation }}{% if R.termines %}, {{ R.termines }} terminent leurs études{% endif %}.
+    {% if R.attente %}{{ R.attente }} élève(s) au résultat en attente ne sont pas traités : vous pourrez les traiter plus tard.{% endif %}
+    Ils sont inscrits en {{ D.annee_dest }} (statut « Ancien » ou « Redoublant »).</p>
+  <button type="submit" {{ 'disabled' if R.a_choisir else '' }}>Exécuter le passage de {{ D.classe.designation }}</button>
+  {% if R.a_choisir %}<p class="pa-note" style="margin-top:6px">Choisissez d'abord la classe d'accueil des {{ R.a_choisir }} élève(s) concerné(s).</p>{% endif %}
+  {% else %}
+  <p class="sous" style="margin:0">Rien à traiter pour le moment : {% if R.faits %}le passage de cette classe est fait{% if R.attente %}, sauf pour les élèves au résultat en attente{% endif %}.{% else %}les résultats annuels ne sont pas encore connus.{% endif %}</p>
+  {% endif %}
+</form>
+{% endif %}
+
+{% if D.peut_modification and R.faits %}
+<div class="espace"></div>
+<div class="carte">
+  <h2 style="margin:0 0 8px;font-size:1.05rem">Annuler un passage</h2>
+  <p class="pa-note">Cochez les élèves dont le passage a été fait par erreur, ou annulez toute la classe. Le motif est obligatoire. L'inscription de {{ D.annee_dest }} est retirée ; refusé si l'élève a déjà un paiement ou des points dans sa nouvelle classe.</p>
+  <div class="ligne">
+    <input type="text" name="motif" form="pa-ann" maxlength="300" placeholder="Motif de l'annulation" aria-label="Motif de l'annulation" required>
+    <button type="submit" form="pa-ann" class="second">Annuler le passage des élèves cochés</button>
+    <button type="submit" form="pa-ann" formaction="{{ url_for('etudes_passage_action', action='annuler_tout') }}" class="second"
+            onclick="return confirm('Annuler le passage de toute la classe {{ D.classe.designation }} ?');">Annuler le passage de toute la classe</button>
+  </div>
+</div>
+{% endif %}
+{% endif %}

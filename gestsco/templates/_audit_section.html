@@ -1,0 +1,11 @@
+<h2 style="margin:18px 0 2px;font-size:1.1rem">{{ s.titre }}</h2>
+{% for n in s.notes %}<div class="petit-texte">{{ n }}</div>{% endfor %}
+{% if not s.lignes %}<p class="sous" style="margin:4px 0 0;font-style:italic">{{ s.get('vide', 'Rien à signaler.') }}</p>
+{% else %}
+<div class="defile"><table class="tableau">
+  <tr>{% for c in s.colonnes %}<th class="{{ 'nb' if c[2] == 'd' else '' }}">{{ c[0] }}</th>{% endfor %}</tr>
+  {% for ligne in s.lignes[:limite_ecran] %}{% set tag = s.couleurs[loop.index0] %}
+  <tr>{% for v in ligne %}<td class="{{ 'nb' if s.colonnes[loop.index0][2] == 'd' else '' }} {{ tag }}">{{ v }}</td>{% endfor %}</tr>{% endfor %}
+</table></div>
+{% if s.lignes|length > limite_ecran %}<p class="petit-texte" style="color:#B25E09;font-weight:600">{{ s.lignes|length }} ligne(s) : les {{ limite_ecran }} premières sont affichées ; le PDF et le CSV contiennent tout.</p>{% endif %}
+{% endif %}

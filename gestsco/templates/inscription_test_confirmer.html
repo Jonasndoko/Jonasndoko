@@ -1,0 +1,17 @@
+{% extends "inscription_base.html" %}
+{% block contenu %}
+<form class="carte form" style="max-width:520px" method="post" action="{{ url_for('inscription_test', n_cand=c.n_cand) }}"
+      onsubmit="this.querySelector('button[type=submit]').disabled=true">
+  <h1>Confirmer le résultat du test</h1>
+  <p class="sous">Un résultat enregistré ne se modifie plus.</p>
+  <dl class="infos" style="grid-template-columns:1fr">
+    <div><dt>Candidat</dt><dd>{{ c.nom_complet }} ({{ c.num_cand }})</dd></div>
+    <div><dt>Note</dt><dd>{{ '%g'|format(note) }} / 100 (seuil {{ '%g'|format(seuil) }})</dd></div>
+  </dl>
+  {% if reussi %}<div class="succes">DOSSIER VALIDÉ : le candidat pourra être affecté à une classe.</div>
+  {% else %}<div class="erreur">ÉCHEC : la candidature sera REFUSÉE (définitif).</div>{% endif %}
+  <input type="hidden" name="note" value="{{ note_txt }}">
+  <div class="actions"><button type="submit">Confirmer et enregistrer</button>
+    <a class="bouton second" href="{{ url_for('inscription_decision', n_cand=c.n_cand) }}">Annuler</a></div>
+</form>
+{% endblock %}

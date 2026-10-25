@@ -1,0 +1,361 @@
+{# Direction de discipline > Suivi de la conduite : vue d'ensemble, observations des professeurs, registre (observations, incidents, mentions), historique d'un élève. #}
+{% set cd = cd %}
+<style>
+.chiffres{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:10px;margin:0 0 14px}
+.chiffre{background:var(--carte);border:1px solid var(--bord);border-radius:10px;padding:12px 14px}
+.chiffre b{display:block;font-size:1.4rem;line-height:1.2}.chiffre span{font-size:.78rem;color:var(--gris)}
+.cd-etiq{display:inline-block;font-size:.75rem;font-weight:600;border:1px solid var(--bord);border-radius:20px;padding:1px 9px;margin-right:4px;white-space:nowrap}
+.cd-etiq.alerte{border-color:var(--rouge);color:var(--rouge)}
+.cd-etiq.positif{border-color:#2E7D32;color:#2E7D32}
+.cd-etiq.neutre{color:var(--gris)}
+.cd-cote{display:inline-block;min-width:2.2em;text-align:center;font-weight:700;border-radius:6px;padding:1px 6px;border:1px solid var(--bord)}
+.cd-cote.faible{border-color:var(--rouge);color:var(--rouge)}
+.cd-annulee{opacity:.6}.cd-annulee .cd-texte{text-decoration:line-through}
+.cd-solde.neg{color:var(--rouge)}.cd-solde.pos{color:#2E7D32}
+.cd-action{margin:0 0 6px}.cd-action summary{cursor:pointer;color:var(--bleu);font-size:.85rem}
+.cd-action form{margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.cd-action input[type=text]{width:auto;min-width:160px;flex:1}
+.cd-form label{display:block;margin:10px 0 3px;font-size:.85rem;color:var(--gris)}
+.cd-form input[type=text],.cd-form input[type=date],.cd-form select,.cd-form textarea{width:100%}
+.cd-grille{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0 14px}
+</style>
+{% macro retour(cd) %}
+<input type="hidden" name="vue" value="{{ cd.vue }}"><input type="hidden" name="annee" value="{{ cd.annee }}"><input type="hidden" name="classe" value="{{ cd.classe }}">
+<input type="hidden" name="periode" value="{{ cd.periode }}"><input type="hidden" name="genre" value="{{ cd.genre }}"><input type="hidden" name="nature" value="{{ cd.nature }}">
+<input type="hidden" name="du" value="{{ cd.du }}"><input type="hidden" name="au" value="{{ cd.au }}"><input type="hidden" name="annulees" value="{{ '1' if cd.annulees else '' }}">
+<input type="hidden" name="q" value="{{ cd.q }}"><input type="hidden" name="eleve" value="{{ cd.eleve }}">
+{% endmacro %}
+{% macro cote(code, libelle) %}{% if code %}<span class="cd-cote {{ 'faible' if code in ('P', 'M') else '' }}" title="{{ libelle }}">{{ code }}</span>{% else %}<span class="sous">-</span>{% endif %}{% endmacro %}
+{% macro nature(x) %}<span class="cd-etiq {{ 'positif' if x.nature == 'POSITIF' else ('alerte' if x.nature == 'NEGATIF' else 'neutre') }}">{{ x.nature_libelle }}</span>{% endmacro %}
+{% macro solde(n) %}<b class="cd-solde {{ 'neg' if n < 0 else ('pos' if n > 0 else '') }}">{{ '%+d'|format(n) if n else '0' }}</b>{% endmacro %}
+{% macro entree(x, cd, avec_eleve=False, annulable=False) %}
+<tr class="{{ 'cd-annulee' if x.annulee else '' }}">
+  <td style="white-space:nowrap">{{ x.date }}</td>
+  {% if avec_eleve %}<td><a class="lien" href="{{ url_for('etudes_sous_menu', sous='direction_discipline', f='conduite', vue='eleve', annee=x.annee, eleve=x.matricule) }}">{{ x.nom_complet }}</a><div class="sous">{{ x.classe }}</div></td>{% endif %}
+  <td><span class="cd-texte"><b>{{ x.libelle }}</b></span><div class="sous">{{ x.genre_libelle }}{% if x.gravite_libelle %} · gravité {{ x.gravite_libelle|lower }}{% endif %}{% if x.lieu %} · {{ x.lieu }}{% endif %}</div></td>
+  <td>{{ nature(x) }}</td>
+  <td class="nb">{{ '%+d'|format(x.points) if x.points else '0' }}</td>
+  <td style="min-width:220px;white-space:normal"><span class="cd-texte">{{ x.description }}</span>{% if x.mesure %}<div class="sous">Mesure prise : {{ x.mesure }}</div>{% endif %}
+    <div class="sous">{{ x.par }}, le {{ x.le }}</div>
+    {% if x.annulee %}<div><span class="cd-etiq alerte">Annulée</span> <span class="sous">{{ x.annulee_par }}, le {{ x.annulee_le }} : {{ x.motif_annulation }}</span></div>{% endif %}</td>
+  {% if annulable %}<td>
+    {% if not x.annulee and cd.peut_annuler and cd.apercu_modifiable %}
+    <details class="cd-action"><summary>Annuler</summary>
+      <form method="post" action="{{ url_for('etudes_conduite_action', action='annuler') }}">
+        {{ retour(cd) }}<input type="hidden" name="id" value="{{ x.id }}">
+        <input type="text" name="motif_annulation" maxlength="300" required placeholder="Motif de l'annulation" aria-label="Motif de l'annulation">
+        <button type="submit" class="clair">Annuler l'entrée</button>
+      </form>
+    </details>
+    {% endif %}
+  </td>{% endif %}
+</tr>
+{% endmacro %}
+
+{% if cd.erreur %}<div class="erreur">{{ cd.erreur }}</div>{% endif %}
+<div class="carte"><p class="sous" style="margin:0">Suivez la <b>conduite</b> des élèves : consultez les <b>cotes de conduite des professeurs</b>, ajoutez vos propres <b>observations disciplinaires</b>, enregistrez les <b>incidents</b> et les <b>comportements inappropriés</b>, suivez les <b>mentions positives et négatives</b> prévues par le règlement scolaire et retrouvez l'<b>historique</b> de chaque élève. Rien n'est supprimé : une entrée enregistrée par erreur s'annule avec un motif et reste visible, marquée « Annulée ». Les cotes des professeurs et les décisions du Préfet ne sont jamais modifiées ici.</p></div>
+<div class="espace"></div>
+
+<nav class="onglets" aria-label="Vue">
+  {% for cle, lib in cd.vues %}
+  <a href="{{ url_for('etudes_sous_menu', sous='direction_discipline', f='conduite', vue=cle, annee=cd.annee or None) }}" class="{{ 'actif' if cd.vue == cle else '' }}" {% if cd.vue == cle %}aria-current="page"{% endif %}>{{ lib }}</a>
+  {% endfor %}
+</nav>
+
+{# ---------------------------------------------------------------- vue d'ensemble #}
+{% if cd.vue == 'apercu' %}
+<form method="get" class="carte">
+  <input type="hidden" name="f" value="conduite"><input type="hidden" name="vue" value="apercu">
+  <div class="ligne">
+    <select name="annee" aria-label="Année scolaire">{% for a in cd.annees %}<option value="{{ a.annee }}" {{ 'selected' if cd.annee == a.annee else '' }}>Année {{ a.annee }}</option>{% endfor %}</select>
+    <select name="classe" aria-label="Classe"><option value="">Toutes les classes</option>
+      {% for k in cd.classes %}<option value="{{ k.n_classe }}" {{ 'selected' if cd.classe == k.n_classe|string else '' }}>{{ k.designation }}</option>{% endfor %}</select>
+    <button type="submit">Afficher</button>
+  </div>
+</form>
+<div class="espace"></div>
+{% if cd.apercu %}
+{% set a = cd.apercu %}
+<h3 style="margin:0 0 8px">{% if a.classe %}{{ a.classe }}{% if a.option %} <span class="sous">· {{ a.option }}</span>{% endif %}{% else %}Toutes les classes{% endif %} · année {{ a.annee }}</h3>
+<div class="chiffres">
+  <div class="chiffre"><b>{{ a.totaux.observations }}</b><span>Observations</span></div>
+  <div class="chiffre"><b>{{ a.totaux.comportements }}</b><span>Comportements inappropriés</span></div>
+  <div class="chiffre"><b>{{ a.totaux.incidents }}</b><span>Incidents</span></div>
+  <div class="chiffre"><b>{{ a.totaux.mentions_positives }}</b><span>Mentions positives</span></div>
+  <div class="chiffre"><b>{{ a.totaux.mentions_negatives }}</b><span>Mentions négatives</span></div>
+  {% if a.classes is not none %}<div class="chiffre"><b>{{ a.totaux.a_suivre_nb }}</b><span>Élèves à suivre</span></div>{% endif %}
+</div>
+{% if a.classes is not none %}
+<div class="carte defile">
+  {% if a.classes %}
+  <table class="tableau">
+    <thead><tr><th>Classe</th><th class="nb">Effectif</th><th class="nb">Observations</th><th class="nb">Comportements</th><th class="nb">Incidents</th><th class="nb">Mentions +</th><th class="nb">Mentions −</th><th class="nb">Solde</th><th class="nb">À suivre</th><th></th></tr></thead>
+    <tbody>
+    {% for c in a.classes %}
+    <tr>
+      <td><b>{{ c.classe }}</b>{% if c.option %}<div class="sous">{{ c.option }}</div>{% endif %}</td>
+      <td class="nb">{{ c.effectif }}</td><td class="nb">{{ c.observations }}</td><td class="nb">{{ c.comportements }}</td><td class="nb">{{ c.incidents }}</td>
+      <td class="nb">{{ c.mentions_positives }}</td><td class="nb">{{ c.mentions_negatives }}</td><td class="nb">{{ solde(c.solde) }}</td>
+      <td class="nb">{% if c.a_suivre_nb %}<b>{{ c.a_suivre_nb }}</b>{% else %}0{% endif %}</td>
+      <td><a class="bouton clair" href="{{ url_for('etudes_sous_menu', sous='direction_discipline', f='conduite', vue='apercu', annee=a.annee, classe=c.n_classe) }}">Ouvrir</a></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="sous" style="margin:0">Aucune classe avec des élèves inscrits pour cette année.</p>{% endif %}
+</div>
+{% else %}
+<p style="margin:0 0 6px"><a class="lien" href="{{ url_for('etudes_sous_menu', sous='direction_discipline', f='conduite', vue='apercu', annee=a.annee) }}">&larr; Toutes les classes</a></p>
+<div class="carte defile">
+  <table class="tableau">
+    <thead><tr><th>Matricule</th><th>Élève</th><th class="nb">Observations</th><th class="nb">Comportements</th><th class="nb">Incidents</th><th class="nb">Mentions +</th><th class="nb">Mentions −</th><th class="nb">Solde</th><th>Situation</th></tr></thead>
+    <tbody>
+    {% for e in a.eleves %}
+    <tr>
+      <td>{{ e.matricule }}</td>
+      <td><a class="lien" href="{{ url_for('etudes_sous_menu', sous='direction_discipline', f='conduite', vue='eleve', annee=a.annee, eleve=e.matricule) }}">{{ e.nom_complet }}</a></td>
+      <td class="nb">{{ e.observations }}</td><td class="nb">{{ e.comportements }}</td><td class="nb">{{ e.incidents }}</td><td class="nb">{{ e.mentions_positives }}</td><td class="nb">{{ e.mentions_negatives }}</td>
+      <td class="nb">{{ solde(e.solde) }}</td>
+      <td>{% if e.a_suivre %}<span class="cd-etiq alerte">À suivre</span>{% else %}<span class="sous">-</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+<p class="sous">Le <b>solde de conduite</b> est la somme des points (règlement scolaire) des entrées valables de l'année ; les entrées annulées ne comptent pas. Un élève est « à suivre » quand son solde descend à {{ a.seuil_solde }} ou quand il cumule {{ a.seuil_negatives }} entrées négatives ou plus.</p>
+{% endif %}
+
+{# ---------------------------------------------------------------- observations des professeurs #}
+{% elif cd.vue == 'professeurs' %}
+<form method="get" class="carte">
+  <input type="hidden" name="f" value="conduite"><input type="hidden" name="vue" value="professeurs">
+  <div class="ligne">
+    <select name="annee" aria-label="Année scolaire">{% for a in cd.annees %}<option value="{{ a.annee }}" {{ 'selected' if cd.annee == a.annee else '' }}>Année {{ a.annee }}</option>{% endfor %}</select>
+    <select name="classe" aria-label="Classe" required><option value="">Choisir une classe</option>
+      {% for k in cd.classes %}<option value="{{ k.n_classe }}" {{ 'selected' if cd.classe == k.n_classe|string else '' }}>{{ k.designation }}</option>{% endfor %}</select>
+    <select name="periode" aria-label="Période"><option value="">Toutes les périodes (cote retenue)</option>
+      {% if cd.profs %}{% for p in cd.profs.periodes %}<option value="{{ p.id_per }}" {{ 'selected' if cd.periode == p.id_per|string else '' }}>{{ p.libelle }} · {{ p.semestre }}</option>{% endfor %}{% endif %}</select>
+    <button type="submit">Afficher</button>
+  </div>
+  <p class="sous" style="margin:6px 0 0">Choisissez la classe, puis affichez : le choix d'une période apparaît ensuite et détaille la cote de chaque professeur.</p>
+</form>
+<div class="espace"></div>
+{% if cd.profs %}
+{% set p = cd.profs %}
+<h3 style="margin:0 0 8px">Conduite de {{ p.classe }}{% if p.option %} <span class="sous">· {{ p.option }}</span>{% endif %}{% if p.periode %} · {{ p.periode }}{% endif %}</h3>
+<div class="chiffres">
+  <div class="chiffre"><b>{{ p.eleves|length }}</b><span>Élèves</span></div>
+  <div class="chiffre"><b>{{ p.nb_cotes_total }}</b><span>Cotes données par les professeurs</span></div>
+  <div class="chiffre"><b>{{ p.a_surveiller }}</b><span>Élèves avec une cote passable ou mauvaise</span></div>
+</div>
+<div class="carte defile">
+  {% if p.id_per %}
+  <table class="tableau">
+    <thead><tr><th>Élève</th>{% for c in p.cours %}<th title="{{ c.professeur }}">{{ c.cours }}</th>{% endfor %}<th>Retenue</th></tr></thead>
+    <tbody>
+    {% for e in p.eleves %}
+    <tr>
+      <td><a class="lien" href="{{ url_for('etudes_sous_menu', sous='direction_discipline', f='conduite', vue='eleve', annee=p.annee, eleve=e.matricule) }}">{{ e.nom_complet }}</a></td>
+      {% for c in e.cotes %}<td>{{ cote(c, '') }}</td>{% endfor %}
+      <td>{{ cote(e.retenue, e.retenue_libelle) }} <span class="sous">{{ e.nb_cotes }}/{{ p.cours|length }}</span></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <table class="tableau">
+    <thead><tr><th>Élève</th>{% for per in p.periodes %}<th>{{ per.libelle }}</th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for e in p.eleves %}
+    <tr>
+      <td><a class="lien" href="{{ url_for('etudes_sous_menu', sous='direction_discipline', f='conduite', vue='eleve', annee=p.annee, eleve=e.matricule) }}">{{ e.nom_complet }}</a></td>
+      {% for x in e.periodes %}<td>{{ cote(x.cote, x.libelle) }}</td>{% endfor %}
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if not p.periodes %}<p class="sous" style="margin:0">Aucune période n'est définie pour cette année.</p>{% endif %}
+  {% endif %}
+</div>
+<p class="sous">Cotes : {% for l in p.legende %}<b>{{ l.code }}</b> {{ l.libelle|lower }}{{ ' · ' if not loop.last }}{% endfor %}. La cote retenue est la plus fréquente parmi les cours ; à égalité, la plus faible (comme sur le bulletin). Passez la souris sur un cours pour voir son professeur.</p>
+{% elif not cd.erreur %}<div class="carte"><p class="sous" style="margin:0">Choisissez une classe pour voir les cotes de conduite données par les professeurs.</p></div>{% endif %}
+
+{# ---------------------------------------------------------------- registre #}
+{% elif cd.vue == 'registre' %}
+<form method="get" class="carte">
+  <input type="hidden" name="f" value="conduite"><input type="hidden" name="vue" value="registre">
+  <div class="ligne">
+    <select name="annee" aria-label="Année scolaire">{% for a in cd.annees %}<option value="{{ a.annee }}" {{ 'selected' if cd.annee == a.annee else '' }}>Année {{ a.annee }}</option>{% endfor %}</select>
+    <select name="classe" aria-label="Classe"><option value="">Toutes les classes</option>
+      {% for k in cd.classes %}<option value="{{ k.n_classe }}" {{ 'selected' if cd.classe == k.n_classe|string else '' }}>{{ k.designation }}</option>{% endfor %}</select>
+    <select name="genre" aria-label="Genre"><option value="">Tous les genres</option>{% for cle, lib in cd.genres.items() %}<option value="{{ cle }}" {{ 'selected' if cd.genre == cle else '' }}>{{ lib }}</option>{% endfor %}</select>
+    <select name="nature" aria-label="Nature"><option value="">Positives et négatives</option>{% for cle, lib in cd.natures.items() %}<option value="{{ cle }}" {{ 'selected' if cd.nature == cle else '' }}>{{ lib }}</option>{% endfor %}</select>
+  </div>
+  <div class="ligne" style="margin-top:8px">
+    <label class="sous" style="margin:0">Du <input type="date" name="du" value="{{ cd.du }}" max="{{ cd.aujourdhui }}"></label>
+    <label class="sous" style="margin:0">au <input type="date" name="au" value="{{ cd.au }}" max="{{ cd.aujourdhui }}"></label>
+    <label class="sous" style="margin:0;white-space:nowrap"><input type="checkbox" name="annulees" value="1" style="width:auto;min-width:0;flex:none" {{ 'checked' if cd.annulees else '' }}> Afficher les entrées annulées</label>
+    <button type="submit">Filtrer</button>
+  </div>
+</form>
+<div class="espace"></div>
+{% if cd.registre %}
+{% set r = cd.registre %}
+{% set _ = cd.update(apercu_modifiable=r.annee_en_cours) %}
+<div class="chiffres">
+  <div class="chiffre"><b>{{ r.totaux.observations }}</b><span>Observations</span></div>
+  <div class="chiffre"><b>{{ r.totaux.comportements }}</b><span>Comportements inappropriés</span></div>
+  <div class="chiffre"><b>{{ r.totaux.incidents }}</b><span>Incidents</span></div>
+  <div class="chiffre"><b>{{ r.totaux.mentions_positives }}</b><span>Mentions positives</span></div>
+  <div class="chiffre"><b>{{ r.totaux.mentions_negatives }}</b><span>Mentions négatives</span></div>
+</div>
+<div class="carte defile">
+  {% if r.entrees %}
+  <table class="tableau">
+    <thead><tr><th>Date</th><th>Élève</th><th>Entrée</th><th>Nature</th><th class="nb">Points</th><th>Description</th><th></th></tr></thead>
+    <tbody>{% for x in r.entrees %}{{ entree(x, cd, True, True) }}{% endfor %}</tbody>
+  </table>
+  {% if r.tronque %}<p class="sous">Seules les {{ r.entrees|length }} entrées les plus récentes sur {{ r.total }} sont affichées : affinez les filtres.</p>{% endif %}
+  {% else %}<p class="sous" style="margin:0">Aucune entrée pour ces filtres.</p>{% endif %}
+</div>
+<p class="sous">Pour ajouter une entrée, ouvrez la fiche de l'élève (onglet « Historique d'un élève », ou cliquez sur son nom) : le formulaire s'y trouve.{% if not cd.peut_annuler %} L'annulation d'une entrée demande le droit « Modification » (Gestionnaire d'accès).{% endif %}</p>
+{% endif %}
+
+{# ---------------------------------------------------------------- historique d'un élève #}
+{% else %}
+<form method="get" class="carte">
+  <input type="hidden" name="f" value="conduite"><input type="hidden" name="vue" value="eleve">
+  <div class="ligne">
+    <select name="annee" aria-label="Année scolaire">{% for a in cd.annees %}<option value="{{ a.annee }}" {{ 'selected' if cd.annee == a.annee else '' }}>Année {{ a.annee }}</option>{% endfor %}</select>
+    <input type="search" name="q" value="{{ cd.q }}" placeholder="Nom, postnom, prénom ou matricule" aria-label="Rechercher un élève">
+    <button type="submit">Rechercher</button>
+  </div>
+</form>
+<div class="espace"></div>
+{% if cd.recherche %}
+<div class="carte defile">
+  {% if cd.recherche.eleves %}
+  <table class="tableau">
+    <thead><tr><th>Matricule</th><th>Élève</th><th>Classe</th><th></th></tr></thead>
+    <tbody>
+    {% for e in cd.recherche.eleves %}
+    <tr><td>{{ e.matricule }}</td><td>{{ e.nom_complet }}</td><td>{{ e.classe }}</td>
+      <td><a class="bouton clair" href="{{ url_for('etudes_sous_menu', sous='direction_discipline', f='conduite', vue='eleve', annee=cd.annee, eleve=e.matricule) }}">Ouvrir l'historique</a></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if cd.recherche.tronque %}<p class="sous">Seuls les premiers élèves sont affichés : affinez la recherche.</p>{% endif %}
+  {% else %}<p class="sous" style="margin:0">Aucun élève ne correspond.</p>{% endif %}
+</div>
+{% elif cd.fiche %}
+{% set f = cd.fiche %}
+{% set _ = cd.update(apercu_modifiable=f.modifiable) %}
+<h3 style="margin:0 0 4px">{{ f.eleve.nom_complet }} {% if f.totaux.a_suivre %}<span class="cd-etiq alerte">À suivre</span>{% endif %}</h3>
+<p class="sous" style="margin:0 0 10px">{{ f.eleve.matricule }} · {{ f.classe }} · année {{ f.annee }}
+  {% if f.annees|length > 1 %}· autres années :
+    {% for a in f.annees if a != f.annee %}<a class="lien" href="{{ url_for('etudes_sous_menu', sous='direction_discipline', f='conduite', vue='eleve', annee=a, eleve=f.eleve.matricule) }}">{{ a }}</a>{{ ', ' if not loop.last }}{% endfor %}{% endif %}</p>
+<div class="chiffres">
+  <div class="chiffre"><b>{{ solde(f.totaux.solde) }}</b><span>Solde de conduite</span></div>
+  <div class="chiffre"><b>{{ f.totaux.observations }}</b><span>Observations</span></div>
+  <div class="chiffre"><b>{{ f.totaux.comportements }}</b><span>Comportements inappropriés</span></div>
+  <div class="chiffre"><b>{{ f.totaux.incidents }}</b><span>Incidents</span></div>
+  <div class="chiffre"><b>{{ f.totaux.mentions_positives }}</b><span>Mentions positives</span></div>
+  <div class="chiffre"><b>{{ f.totaux.mentions_negatives }}</b><span>Mentions négatives</span></div>
+</div>
+
+{% if cd.peut_ajouter and f.modifiable %}
+<h3 class="sec" id="nouvelle">Ajouter une entrée</h3>
+<form method="post" action="{{ url_for('etudes_conduite_action', action='ajouter') }}" class="carte cd-form" id="cd-formulaire">
+  {{ retour(cd) }}<input type="hidden" name="matricule" value="{{ f.eleve.matricule }}">
+  {% set fm = cd.form %}
+  <div class="cd-grille">
+    <div><label for="cd-type">Que voulez-vous enregistrer ?</label>
+      <select id="cd-type" name="type_entree" required>
+        {% for cle, lib in cd.genres.items() %}<option value="{{ cle }}" {{ 'selected' if fm.get('type_entree', 'OBSERVATION') == cle else '' }}>{{ lib }}{{ ' (positive ou négative)' if cle == 'MENTION' else '' }}</option>{% endfor %}
+      </select></div>
+    <div><label for="cd-date">Date des faits</label><input id="cd-date" type="date" name="date_fait" value="{{ fm.get('date_fait') or cd.aujourdhui }}" max="{{ cd.aujourdhui }}" required></div>
+    <div id="cd-bloc-nature"><label for="cd-nature">Nature de l'observation</label>
+      <select id="cd-nature" name="nature_obs">{% for cle, lib in cd.natures.items() %}<option value="{{ cle }}" {{ 'selected' if fm.get('nature_obs', 'NEUTRE') == cle else '' }}>{{ lib }}</option>{% endfor %}</select></div>
+    <div id="cd-bloc-code"><label for="cd-code">Selon le règlement scolaire</label>
+      <select id="cd-code" name="code">
+        <option value="">Choisir dans la liste</option>
+        {% for a in cd.reglement %}<option value="{{ a.code }}" data-genre="{{ a.genre }}" {{ 'selected' if fm.get('code') == a.code else '' }}>{{ a.libelle }} ({{ '%+d'|format(a.points) }} pt{{ 's' if a.points|abs > 1 else '' }}{{ ', ' ~ a.gravite_libelle|lower if a.gravite_libelle else '' }})</option>{% endfor %}
+      </select></div>
+  </div>
+  <label for="cd-desc">Description des faits ou de l'observation</label>
+  <textarea id="cd-desc" name="description" rows="4" maxlength="1000" required>{{ fm.get('description', '') }}</textarea>
+  <div class="cd-grille">
+    <div><label for="cd-lieu">Lieu (facultatif)</label><input id="cd-lieu" type="text" name="lieu" maxlength="100" value="{{ fm.get('lieu', '') }}"></div>
+    <div><label for="cd-mesure">Mesure prise (facultatif)</label><input id="cd-mesure" type="text" name="mesure" maxlength="300" value="{{ fm.get('mesure', '') }}"></div>
+  </div>
+  <div style="margin-top:12px"><button type="submit">Enregistrer</button></div>
+</form>
+<script>
+(function () {
+  const type = document.getElementById("cd-type"), code = document.getElementById("cd-code");
+  const blocNature = document.getElementById("cd-bloc-nature"), blocCode = document.getElementById("cd-bloc-code");
+  function maj() {
+    const t = type.value, obs = t === "OBSERVATION";
+    blocNature.hidden = !obs; blocCode.hidden = obs;
+    Array.from(code.options).forEach(o => { if (o.dataset.genre) { const ok = o.dataset.genre === t; o.hidden = !ok; o.disabled = !ok; } });
+    if (code.selectedOptions[0] && code.selectedOptions[0].disabled) code.value = "";
+  }
+  type.addEventListener("change", maj); maj();
+})();
+</script>
+{% elif cd.peut_ajouter %}<p class="sous">Consultation seule : on n'enregistre que pour l'année en cours, et pour un élève actif.</p>
+{% else %}<p class="sous">Vous pouvez consulter la conduite, mais pas enregistrer d'entrée : le droit « Ajout » ne vous est pas accordé.</p>{% endif %}
+
+<h3 class="sec">Observations de conduite des professeurs</h3>
+<div class="carte defile">
+  {% if f.conduite %}
+  <table class="tableau">
+    <thead><tr><th>Période</th><th>Cote retenue</th><th>Cote de chaque professeur</th></tr></thead>
+    <tbody>
+    {% for p in f.conduite %}
+    <tr>
+      <td><b>{{ p.periode }}</b><div class="sous">{{ p.semestre }}</div></td>
+      <td>{{ cote(p.cote, p.libelle) }}{% if p.libelle %} <span class="sous">{{ p.libelle }}</span>{% endif %}</td>
+      <td class="sous" style="white-space:normal">
+        {% if p.detail %}{% for d in p.detail %}<span style="white-space:nowrap">{{ d.cours }} : {{ cote(d.cote, d.libelle) }}{{ ', ' if not loop.last }}</span> {% endfor %}
+        {% else %}Aucune cote donnée.{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="sous" style="margin:0">Aucune période n'est définie pour cette année.</p>{% endif %}
+</div>
+
+<h3 class="sec">Observations, incidents et mentions de la Direction</h3>
+<div class="carte defile">
+  {% if f.entrees %}
+  <table class="tableau">
+    <thead><tr><th>Date</th><th>Entrée</th><th>Nature</th><th class="nb">Points</th><th>Description</th><th></th></tr></thead>
+    <tbody>{% for x in f.entrees %}{{ entree(x, cd, False, True) }}{% endfor %}</tbody>
+  </table>
+  {% else %}<p class="sous" style="margin:0">Aucune entrée pour cette année.</p>{% endif %}
+</div>
+
+{% if f.decisions %}
+<h3 class="sec">Décisions disciplinaires du Préfet</h3>
+<div class="carte defile">
+  <table class="tableau">
+    <thead><tr><th>Date</th><th>Objet</th><th>Détail</th></tr></thead>
+    <tbody>{% for d in f.decisions %}<tr class="{{ 'cd-annulee' if d.annulee else '' }}"><td style="white-space:nowrap">{{ d.date }}</td><td><b>{{ d.objet }}</b>{% if d.annulee %} <span class="cd-etiq alerte">Annulée</span>{% endif %}</td><td class="sous" style="white-space:normal">{{ d.detail }}</td></tr>{% endfor %}</tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if f.resume|length > 1 %}
+<h3 class="sec">Résumé de chaque année</h3>
+<div class="carte defile">
+  <table class="tableau">
+    <thead><tr><th>Année</th><th>Classe</th><th class="nb">Observations</th><th class="nb">Comportements</th><th class="nb">Incidents</th><th class="nb">Mentions +</th><th class="nb">Mentions −</th><th class="nb">Solde</th></tr></thead>
+    <tbody>{% for r in f.resume %}<tr><td><a class="lien" href="{{ url_for('etudes_sous_menu', sous='direction_discipline', f='conduite', vue='eleve', annee=r.annee, eleve=f.eleve.matricule) }}">{{ r.annee }}</a></td><td>{{ r.classe }}</td><td class="nb">{{ r.observations }}</td><td class="nb">{{ r.comportements }}</td><td class="nb">{{ r.incidents }}</td><td class="nb">{{ r.mentions_positives }}</td><td class="nb">{{ r.mentions_negatives }}</td><td class="nb">{{ solde(r.solde) }}</td></tr>{% endfor %}</tbody>
+  </table>
+</div>
+{% endif %}
+{% elif not cd.erreur %}<div class="carte"><p class="sous" style="margin:0">Recherchez un élève (nom, postnom, prénom ou matricule) pour ouvrir son historique de conduite.</p></div>{% endif %}
+{% endif %}

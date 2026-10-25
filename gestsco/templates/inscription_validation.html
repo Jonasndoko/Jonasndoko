@@ -1,0 +1,24 @@
+{% extends "inscription_base.html" %}
+{% block contenu %}
+<form class="carte" method="get" action="/m/inscription/validation">
+  <div class="ligne">
+    <div style="flex:1;min-width:200px"><label for="filtre">Afficher</label>
+      <select id="filtre" name="filtre">{% for cle, libelle, _e in filtres %}<option value="{{ cle }}" {{ 'selected' if cle == filtre else '' }}>{{ libelle }}</option>{% endfor %}</select></div>
+    <div style="flex:1;min-width:200px"><label for="q">Recherche (nom, N° de candidat, reçu, matricule)</label><input id="q" name="q" value="{{ recherche }}" autocomplete="off"></div>
+    <div style="align-self:end"><button type="submit">Afficher</button></div>
+  </div>
+</form>
+{% if erreur %}<div class="erreur espace" role="alert">{{ erreur }}</div>{% endif %}
+<p class="sous espace">{% if annee %}{{ liste|length }} candidat(s) - année {{ annee }}{% else %}Aucune année scolaire n'est définie.{% endif %}</p>
+{% if liste %}
+<div class="carte"><div class="defile"><table class="tableau">
+  <tr><th>N° candidat</th><th>Nom</th><th>Classe souhaitée</th><th class="nb">Note</th><th>Étape</th><th>Classe d'affectation</th><th>Matricule</th><th></th></tr>
+  {% for c in liste %}
+  <tr><td>{{ c.num_cand }}</td><td>{{ c.nom_complet }}</td><td>{{ c.classe }}</td><td class="nb">{{ c.note_test or '' }}</td>
+    <td><span class="badge {{ 'solde' if c.etape == 'ADMIS' else ('impaye' if c.etape in ('REFUSE', 'RETIRE') else 'partiel') }}">{{ c.libelle_etape }}</span></td>
+    <td>{{ c.classe_affectee }}</td><td>{{ c.matricule or '' }}</td>
+    <td><a class="lien" href="{{ url_for('inscription_decision', n_cand=c.n_cand) }}">{{ 'Traiter' if c.etape in ('A_TESTER', 'A_AFFECTER') else 'Ouvrir' }}</a></td></tr>
+  {% endfor %}
+</table></div></div>
+{% endif %}
+{% endblock %}

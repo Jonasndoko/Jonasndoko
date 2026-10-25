@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{# Écran principal, comme dans le logiciel Windows : barre latérale (menu principal) à gauche, contenu à droite. #}
+{% block cadre %}
+<style>
+html,body{height:100%}
+body{display:flex;flex-direction:column}
+.pied{display:none}
+.ecran{display:flex;flex:1;min-height:0}
+.lateral{--lat:#0A1E45;--survol:#183268;--actif:#1D4ED8;--txt:#C5D0EA;background:var(--lat);color:var(--txt);width:270px;flex:none;display:flex;flex-direction:column;
+  transition:width .18s ease;overflow:hidden;position:sticky;top:0;height:100vh;align-self:flex-start}
+.lat-tete{display:flex;align-items:center;gap:10px;padding:16px 12px 8px;min-height:64px}
+.lat-tete img{height:40px;width:auto;flex:none}
+.lat-nom{flex:1;min-width:0}.lat-nom b{display:block;color:#fff;font-family:Georgia,serif;font-size:1.15rem;line-height:1.1}
+.lat-nom small{display:block;font-size:.7rem;color:var(--txt);text-transform:capitalize}
+.lat-sep{height:1px;background:var(--survol);margin:6px 12px 10px}
+.lat-btn{background:transparent;border:0;color:#fff;padding:6px 8px;border-radius:8px;font-size:1.1rem;line-height:1;cursor:pointer}
+.lat-btn:hover{background:var(--survol);filter:none}
+.lat-section{display:flex;align-items:center;justify-content:space-between;padding:14px 18px 4px;font-size:.72rem;font-weight:700;letter-spacing:.06em;color:var(--txt);cursor:pointer;user-select:none}
+.lat-section .lat-btn{font-size:.8rem;color:var(--txt);padding:2px 6px}
+.lat-liste{overflow-y:auto;flex:1;min-height:0}
+.lat-liste.ferme{display:none}
+.entree{display:flex;align-items:center;gap:12px;margin:1px 10px;padding:8px 12px;border-radius:8px;color:var(--txt);text-decoration:none;font-size:.95rem;background:transparent;border:0;width:calc(100% - 20px);text-align:left;font-family:inherit;cursor:pointer}
+.entree img{width:24px;height:24px;flex:none}
+.entree:hover{background:var(--survol);color:#fff;filter:none}
+.entree.actif{background:var(--actif);color:#fff;font-weight:700;cursor:default}
+.entree .bientot{font-size:.65rem;background:#FDF0DC;color:#8A5300;border-radius:99px;padding:0 7px;margin-left:auto;white-space:nowrap}
+.entree.sous-entree{padding:5px 12px 5px 48px;font-size:.85rem}
+.lat-pied{padding:0 0 14px}
+.lat-pied form{margin:0}
+/* barre repliée : pictogrammes seulement */
+body.replie .lateral{width:68px}
+body.replie .lat-nom,body.replie .lat-section,body.replie .entree span,body.replie .sous-entree,body.replie .entree .bientot,body.replie .lat-tete .lat-btn{display:none}
+body.replie .lat-liste.ferme{display:block}
+body.replie .lat-tete{justify-content:center;padding:16px 4px 8px}
+.droite{flex:1;min-width:0;display:flex;flex-direction:column}
+.barre{background:var(--carte);border-bottom:1px solid var(--bord);display:flex;align-items:center;gap:8px;padding:10px 16px;flex-wrap:wrap}
+.barre .lat-btn{color:var(--texte)}.barre .lat-btn:hover{background:var(--fond)}
+.barre .titre{font-family:Georgia,serif;font-weight:bold;font-size:1rem;flex:1;min-width:160px}
+.barre .qui{font-size:.85rem;color:var(--gris)}
+.barre form{margin:0}
+.barre .bouton{padding:6px 12px;font-size:.88rem}
+.contenu{padding:24px 28px;flex:1}
+@media(max-width:800px){.lateral{width:68px}.lat-nom,.lat-section,.entree span,.entree .bientot,.sous-entree,.lat-tete .lat-btn{display:none}.lat-liste.ferme{display:block}.lat-tete{justify-content:center;padding:16px 4px 8px}.contenu{padding:16px}}
+</style>
+<div class="ecran">
+  <nav class="lateral" aria-label="Menu principal">
+    <div class="lat-tete">
+      <img src="/assets/logo_96.png" alt="">
+      <div class="lat-nom"><b>{{ cfg.SIGLE_APP }}</b><small>{{ cfg.NOM_ECOLE }}</small></div>
+      <button type="button" class="lat-btn" id="replier" title="Replier le menu" aria-label="Replier le menu">&#10094;</button>
+    </div>
+    <div class="lat-sep"></div>
+    {% if tableau_ok %}
+    <a class="entree {% if actif == 'tableau' %}actif{% endif %}" href="/tableau-de-bord" title="Tableau de bord" {% if actif == 'tableau' %}aria-current="page"{% endif %}>
+      <img src="/assets/ico_tableau.png" alt=""><span>Tableau de bord</span></a>
+    {% endif %}
+    <div class="lat-section" id="section-menu"><span>MENU PRINCIPAL</span><button type="button" class="lat-btn" id="plier-modules" aria-label="Plier la liste des modules">&#9662;</button></div>
+    <div class="lat-liste" id="liste-modules">
+      {% for cle, titre, en_ligne in modules %}
+      <a class="entree" href="/m/{{ cle }}" title="{{ titre }}"><img src="/assets/ico_{{ cle }}.png" alt=""><span>{{ titre }}</span>{% if not en_ligne %}<i class="bientot" style="font-style:normal">bientôt</i>{% endif %}</a>
+      {% else %}
+      <p style="padding:0 18px;font-size:.85rem">Aucun module ouvert</p>
+      {% endfor %}
+    </div>
+    <div class="lat-pied">
+      <div class="lat-sep"></div>
+      <form method="post" action="/deconnexion"><button type="submit" class="entree" title="Se déconnecter"><img src="/assets/ico_sortie.png" alt=""><span>Se déconnecter</span></button></form>
+    </div>
+  </nav>
+  <div class="droite">
+    <div class="barre">
+      <button type="button" class="lat-btn" id="replier2" title="Replier / ouvrir le menu" aria-label="Replier ou ouvrir le menu">&#9776;</button>
+      <span class="titre">{{ cfg.NOM_APP }}</span>
+      <span class="qui">{{ s.nom_complet }} · {{ s.libelle_role }}</span>
+      <a class="bouton second" href="/mot-de-passe">Mon mot de passe</a>
+    </div>
+    <main class="contenu" style="max-width:none;margin:0">{% block corps %}{% endblock %}</main>
+  </div>
+</div>
+<script>
+(function(){
+  var b=document.body, lst=document.getElementById('liste-modules');
+  function lire(k){try{return localStorage.getItem(k)}catch(e){return null}}
+  function ecrire(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+  if(lire('gestisc_replie')==='1')b.classList.add('replie');
+  if(lire('gestisc_modules')==='0')lst.classList.add('ferme');
+  function basculer(){b.classList.toggle('replie');ecrire('gestisc_replie',b.classList.contains('replie')?'1':'0')}
+  document.getElementById('replier').onclick=basculer;
+  document.getElementById('replier2').onclick=basculer;
+  document.getElementById('section-menu').onclick=function(){lst.classList.toggle('ferme');ecrire('gestisc_modules',lst.classList.contains('ferme')?'0':'1')};
+})();
+</script>
+{% endblock %}
