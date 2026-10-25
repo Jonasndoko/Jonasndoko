@@ -22,3 +22,9 @@ __pycache__/
 venv/
 .idea/
 .vscode/
+
+*.db
+*.sqlite
+.env
+__pycache__/
+*.pyc
