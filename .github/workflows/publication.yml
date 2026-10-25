@@ -1,0 +1,45 @@
+name: Publication
+# Se déclenche quand on envoie une étiquette de version (python outils/version.py publier).
+on:
+  push:
+    tags: ["v[0-9]*"]
+permissions:
+  contents: write
+jobs:
+  publier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt reportlab pillow
+      - name: L'étiquette doit correspondre à config.py
+        run: |
+          V=$(python -c "import re;print(re.search(r'^VERSION\s*=\s*\"([^\"]+)\"',open('config.py',encoding='utf-8').read(),re.M).group(1))")
+          [ "v$V" = "${GITHUB_REF_NAME}" ] || { echo "Étiquette ${GITHUB_REF_NAME} ≠ config.py ($V)"; exit 1; }
+      - name: Tests
+        env:
+          CSF_DATA_DIR: ${{ runner.temp }}/donnees
+        run: |
+          mkdir -p "$CSF_DATA_DIR"
+          python -m unittest discover -s . -p "test_*.py"
+      - name: Fichier de mise à jour (.csfupd)
+        env:
+          GESTSCO_CLE_MAJ: ${{ secrets.GESTSCO_CLE_MAJ }}
+          CSF_DATA_DIR: ${{ runner.temp }}/donnees
+        run: |
+          if [ -n "$GESTSCO_CLE_MAJ" ]; then
+            python outils/version.py paquet "gestsco_${GITHUB_REF_NAME#v}.csfupd" | tee paquet.txt
+          else
+            echo "Secret GESTSCO_CLE_MAJ absent : pas de fichier .csfupd." | tee paquet.txt
+          fi
+      - name: Release GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --title "GESTSCO ${GITHUB_REF_NAME#v}" --generate-notes \
+            --notes-file <(sed -n "/^## ${GITHUB_REF_NAME#v} /,/^## /p" CHANGELOG.md | sed '$d'; echo; cat paquet.txt) \
+            $(ls *.csfupd 2>/dev/null)

@@ -1,0 +1,8 @@
+{% macro date(nom, libelle, valeur) %}<div><label for="f-{{ nom }}">{{ libelle }}</label><input id="f-{{ nom }}" type="date" name="{{ nom }}" value="{{ valeur or '' }}"></div>{% endmacro %}
+{% macro texte(nom, libelle, valeur) %}<div><label for="f-{{ nom }}">{{ libelle }}</label><input id="f-{{ nom }}" type="text" name="{{ nom }}" value="{{ valeur or '' }}" autocomplete="off"></div>{% endmacro %}
+{% macro choix(nom, libelle, options, valeur, tous) %}<div><label for="f-{{ nom }}">{{ libelle }}</label>
+  <select id="f-{{ nom }}" name="{{ nom }}"><option value="">{{ tous }}</option>{% for val, lib in options %}<option value="{{ val }}" {{ 'selected' if val|string == (valeur or '') else '' }}>{{ lib }}</option>{% endfor %}</select></div>{% endmacro %}
+{% macro exporter(nature, q) %}
+<a class="bouton second petit" href="{{ url_for('audit_export', nature=nature, format='csv', **q) }}">Exporter (Excel / CSV)</a>
+<a class="bouton second petit" href="{{ url_for('audit_export', nature=nature, format='pdf', **q) }}">Imprimer (PDF)</a>
+{% endmacro %}

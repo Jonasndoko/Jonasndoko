@@ -1,0 +1,15 @@
+{% extends "inscription_base.html" %}
+{% block contenu %}
+<form class="carte form" style="max-width:520px" method="post" action="{{ url_for('inscription_affecter', n_cand=c.n_cand) }}"
+      onsubmit="this.querySelector('button[type=submit]').disabled=true">
+  <h1>Confirmer l'affectation</h1>
+  <dl class="infos" style="grid-template-columns:1fr">
+    <div><dt>Candidat</dt><dd>{{ c.nom_complet }} ({{ c.num_cand }})</dd></div>
+    <div><dt>Classe d'affectation</dt><dd>{{ classe }}</dd></div>
+  </dl>
+  <p class="sous">Le candidat devient ÉLÈVE : un matricule lui est attribué et il est inscrit dans la classe pour l'année {{ c.annee }}.</p>
+  <input type="hidden" name="classe" value="{{ n_classe }}">
+  <div class="actions"><button type="submit">Confirmer et affecter</button>
+    <a class="bouton second" href="{{ url_for('inscription_decision', n_cand=c.n_cand) }}">Annuler</a></div>
+</form>
+{% endblock %}

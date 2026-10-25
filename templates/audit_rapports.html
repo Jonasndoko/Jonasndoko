@@ -1,0 +1,31 @@
+{% extends "audit_base.html" %}
+{% from "_audit_macros.html" import date, choix, exporter %}
+{% block contenu %}
+<form method="get" class="filtres" action="{{ url_for('audit_rapports_page') }}">
+  <input type="hidden" name="consulter" value="1">
+  <div class="cols" style="margin-top:12px">
+    {% for cle, titre in types.items() %}
+    <label style="display:flex;gap:8px;align-items:flex-start;color:var(--texte);margin:6px 0"><input type="radio" name="type" value="{{ cle }}" {{ 'checked' if cle == type_ else '' }} style="width:auto;margin-top:5px">
+      <span><b>{{ titre }}</b><br><span class="petit-texte">{{ descriptions[cle] }}</span></span></label>{% endfor %}
+  </div>
+  <div class="grille-f">
+    {{ date('du', 'Du', v.du) }}{{ date('au', 'Au', v.au) }}
+    {{ choix('u', 'Utilisateur', utilisateurs, v.u, 'Tous les utilisateurs') }}
+    {{ choix('perc', 'Percepteur', percepteurs, v.perc, 'Tous les percepteurs') }}
+    {{ choix('devise', 'Devise', devises, v.devise, 'Toutes les devises') }}
+  </div>
+  <label class="case-f"><input type="checkbox" name="detail" value="1" {{ 'checked' if avec_detail else '' }}> Inclure le détail de toutes les opérations (rapports général et complet)</label>
+  <div class="actions"><button type="submit">Consulter</button>
+    <span style="flex:1"></span>{{ exporter('rapport', dict(q, type=type_, detail=('1' if avec_detail else ''))) }}</div>
+</form>
+{% if not d %}<p class="sous">Choisissez un rapport, la période et les filtres, puis cliquez sur « Consulter ». « Imprimer (PDF) » produit le même rapport, prêt à signer.</p>
+{% else %}
+<div class="carte">
+  <h2 style="margin:0;font-size:1.3rem">{{ d.titre }}</h2>
+  <div class="petit-texte">{% for l in d.filtres %}{{ l }}<br>{% endfor %}Édité le {{ d.genere_le }} par {{ d.genere_par }}<br>
+    Journal : {{ d.journal.nb_lignes }} ligne(s), {% if d.journal.ok %}chaîne d'empreintes intacte{% else %}<span class="rouge">ANOMALIE à la ligne {{ d.journal.anomalie }}</span>{% endif %}, dernière empreinte {{ d.journal.derniere_empreinte[:16] }}
+    {% if d.reinitialisation %}<br>Les opérations antérieures à la dernière réinitialisation de l'application ne sont pas contrôlées.{% endif %}</div>
+  {% for s in sections %}{% include "_audit_section.html" %}{% endfor %}
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block titre %}Présence des élèves{% endblock %}
+{% block entete %}
+{% if menu_utile %}<a class="bouton clair" href="/">Menu</a>{% endif %}
+<span style="font-size:.85rem">{{ s.nom_complet }} · {{ s.libelle_role }}</span>
+<form method="post" action="/deconnexion"><button class="clair" type="submit">Déconnexion</button></form>
+{% endblock %}
+{% block corps %}
+<h1>Présence des élèves</h1>
+{% include "_etudes_gestion_style.html" %}
+{% if erreur %}<div class="erreur" role="alert">{{ erreur }}</div>{% endif %}
+{% include "_presence_eleves_corps.html" %}
+{% endblock %}

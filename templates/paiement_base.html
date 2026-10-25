@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block titre %}Paiement des frais{% endblock %}
+{% block entete %}
+{% if menu_utile %}<a class="bouton clair" href="/">Menu</a>{% endif %}
+<span style="font-size:.85rem">{{ s.nom_complet }} · {{ s.libelle_role }}</span>
+<form method="post" action="/deconnexion"><button class="clair" type="submit">Déconnexion</button></form>
+{% endblock %}
+{% block corps %}
+<h1>Paiement des frais scolaires</h1>
+<nav class="onglets" aria-label="Onglets du module">
+  {% for cle, libelle, lien in onglets %}
+    {% if cle in autorises %}<a href="{{ lien }}" class="{{ 'actif' if cle == onglet else '' }}">{{ libelle }}</a>
+    {% else %}<span class="verrou" title="{{ motif_verrou }}">{{ libelle }} (réservé)</span>{% endif %}
+  {% endfor %}
+</nav>
+{% block contenu %}{% endblock %}
+{% endblock %}

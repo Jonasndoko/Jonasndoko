@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block titre %}Secrétariat · Inscription{% endblock %}
+{% block entete %}
+{% if menu_utile %}<a class="bouton clair" href="/">Menu</a>{% endif %}
+<span style="font-size:.85rem">{{ s.nom_complet }} · {{ s.libelle_role }}</span>
+<form method="post" action="/deconnexion"><button class="clair" type="submit">Déconnexion</button></form>
+{% endblock %}
+{% block corps %}
+{# L'inscription est une fonctionnalité du Secrétariat : même cadre que ses autres onglets (si le compte a accès au Secrétariat). #}
+{% set espaces = sous_menus_etudes | map(attribute='0') | list %}
+{% set dans_secretariat = 'dossier_eleve' in espaces %}
+<style>
+.sv{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px;border-bottom:1px solid var(--bord)}
+.sv a,.sv .verrou{padding:8px 14px;border-radius:8px 8px 0 0;font-size:.9rem;text-decoration:none;color:var(--gris)}
+.sv a.actif{background:var(--carte);color:var(--bleu);font-weight:600;border:1px solid var(--bord);border-bottom-color:var(--carte);margin-bottom:-1px}
+.sv .verrou{opacity:.55;cursor:not-allowed}
+</style>
+{% if dans_secretariat %}
+{% set sous = 'dossier_eleve' %}{% set fonction = 'inscription' %}{% set titre = cfg.TITRE_MODULE_SECRETARIAT %}{% set groupes_boutons = groupes_boutons_espace('dossier_eleve') %}
+<h1 style="margin-top:0">{{ titre }}</h1>
+<p class="sous" style="margin:0 0 12px">{{ cfg.DESCRIPTIONS_SOUS_MENUS_ETUDES.get('dossier_eleve', '') }}</p>
+{% include "_etudes_boutons.html" %}
+{% else %}
+<h1>Inscription</h1>
+{% endif %}
+<nav class="{{ 'sv' if dans_secretariat else 'onglets' }}" aria-label="Étapes de l'inscription">
+  {% for cle, libelle, lien in onglets %}
+    {% if cle in autorises %}<a href="{{ lien }}" class="{{ 'actif' if cle == onglet else '' }}">{{ libelle }}</a>
+    {% else %}<span class="verrou" title="{{ reserve.get(cle, '') }}">{{ libelle }} (réservé)</span>{% endif %}
+  {% endfor %}
+</nav>
+{% block contenu %}{% endblock %}
+{% endblock %}

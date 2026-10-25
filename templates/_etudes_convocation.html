@@ -1,0 +1,179 @@
+{# Direction de discipline > Convocation du parent : nouvelle convocation (élève, parent, motif, rendez-vous, instructions, envoi), liste, détail et lettre. #}
+{% set cv = cv %}
+<style>
+.cv-etiq{display:inline-block;font-size:.75rem;font-weight:600;border:1px solid var(--bord);border-radius:20px;padding:1px 9px;white-space:nowrap}
+.cv-etiq.ENVOYEE{border-color:#2E7D32;color:#2E7D32}.cv-etiq.ANNULEE{border-color:var(--rouge);color:var(--rouge)}.cv-etiq.BROUILLON{color:var(--gris)}
+.cv-form label{display:block;margin:10px 0 3px;font-size:.85rem;color:var(--gris)}
+.cv-form input[type=text],.cv-form input[type=date],.cv-form input[type=time],.cv-form textarea{width:100%}
+.cv-grille{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0 14px}
+.cv-parent{border:1px solid var(--bord);border-radius:10px;padding:10px 14px;margin:8px 0;background:var(--carte)}
+.cv-lettre{max-width:520px;margin:0 auto;border:1px solid var(--bord);border-radius:14px;padding:20px 22px;background:var(--carte)}
+.cv-lettre .ecole{text-align:center;font-weight:700;font-size:1.05rem;margin:0}
+.cv-lettre .service{text-align:center;color:var(--gris);margin:2px 0 10px}
+.cv-lettre h3{text-align:center;font-size:1.25rem;margin:6px 0 12px;padding-bottom:12px;border-bottom:1px solid var(--bord)}
+.cv-lettre p{margin:8px 0}.cv-lettre .sign{color:var(--gris);font-size:.9rem;margin-top:14px}
+.chiffres{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:10px;margin:0 0 14px}
+.chiffre{background:var(--carte);border:1px solid var(--bord);border-radius:10px;padding:12px 14px}
+.chiffre b{display:block;font-size:1.4rem;line-height:1.2}.chiffre span{font-size:.78rem;color:var(--gris)}
+</style>
+{% macro lettre(l) %}
+<div class="cv-lettre">
+  <p class="ecole">{{ l.ecole }}</p><p class="service">{{ l.service }}</p>
+  <h3>{{ l.titre }}</h3>
+  {% for nom, val in l.lignes %}<p><b>{{ nom }} :</b> {{ val }}</p>{% endfor %}
+  {% if l.instructions %}<p><b>Instructions :</b> {{ l.instructions }}</p>{% endif %}
+  <p>{{ l.texte }}</p>
+  <p class="sign">{{ l.signature }}</p>
+</div>
+{% endmacro %}
+
+{% if cv.erreur %}<div class="erreur">{{ cv.erreur }}</div>{% endif %}
+<div class="carte"><p class="sous" style="margin:0">Convoquez le <b>parent ou tuteur</b> d'un élève : choisissez l'élève, vérifiez les coordonnées de son parent, indiquez le <b>motif</b>, fixez la <b>date, l'heure et le lieu</b> du rendez-vous, ajoutez des <b>instructions</b> si nécessaire, puis envoyez la convocation : le parent la reçoit en <b>notification dans l'application mobile</b>. Rien n'est supprimé : une convocation s'annule avec un motif et reste visible, marquée « Annulée ».</p></div>
+<div class="espace"></div>
+
+<nav class="onglets" aria-label="Vue">
+  {% for cle, lib in cv.vues %}
+  <a href="{{ url_for('etudes_sous_menu', sous='direction_discipline', f='convocation', vue=cle) }}" class="{{ 'actif' if cv.vue == cle else '' }}" {% if cv.vue == cle %}aria-current="page"{% endif %}>{{ lib }}</a>
+  {% endfor %}
+</nav>
+
+{# ---------------------------------------------------------------- nouvelle convocation #}
+{% if cv.vue == 'nouvelle' %}
+{% if not cv.peut_envoyer %}<div class="carte"><p class="sous" style="margin:0">Vous pouvez consulter les convocations, mais pas en enregistrer : le droit « Ajout » ne vous est pas accordé.</p></div>
+{% elif not cv.fiche %}
+<form method="get" class="carte">
+  <input type="hidden" name="f" value="convocation"><input type="hidden" name="vue" value="nouvelle">
+  <h2 style="margin:0 0 8px;font-size:1.1rem">1. Sélectionner l'élève concerné</h2>
+  <div class="ligne"><input type="text" name="q" value="{{ cv.q }}" placeholder="Nom, postnom, prénom ou matricule" aria-label="Rechercher un élève" style="flex:1;min-width:200px" autofocus>
+  <button type="submit">Rechercher</button></div>
+</form>
+{% if cv.trouves %}
+<div class="espace"></div>
+<div class="carte">
+  {% if cv.trouves.eleves %}
+  <table class="tableau"><thead><tr><th>Matricule</th><th>Élève</th><th>Classe</th><th></th></tr></thead><tbody>
+  {% for e in cv.trouves.eleves %}
+  <tr><td>{{ e.matricule }}</td><td>{{ e.nom_complet }}</td><td>{{ e.classe }}</td>
+  <td><a class="bouton clair" href="{{ url_for('etudes_sous_menu', sous='direction_discipline', f='convocation', vue='nouvelle', eleve=e.matricule) }}">Convoquer</a></td></tr>
+  {% endfor %}</tbody></table>
+  {% if cv.trouves.tronque %}<p class="sous">Seuls les premiers élèves sont affichés : affinez la recherche.</p>{% endif %}
+  {% else %}<p class="sous" style="margin:0">Aucun élève actif du secondaire et humanitaire ne correspond à « {{ cv.trouves.texte }} ».</p>{% endif %}
+</div>
+{% endif %}
+{% else %}
+{% set fi = cv.fiche %}
+<p style="margin:0 0 6px"><a class="lien" href="{{ url_for('etudes_sous_menu', sous='direction_discipline', f='convocation', vue='nouvelle') }}">&larr; Choisir un autre élève</a></p>
+<form method="post" action="{{ url_for('etudes_convocation_action', action='enregistrer') }}" class="carte cv-form">
+  <input type="hidden" name="matricule" value="{{ fi.matricule }}">
+  <h2 style="margin:0 0 8px;font-size:1.1rem">Élève : {{ fi.nom_complet }} <span class="sous" style="font-size:.9rem">· {{ fi.classe }} · {{ fi.matricule }}</span></h2>
+
+  <h3 style="margin:14px 0 4px;font-size:1rem">2. Parent ou tuteur</h3>
+  <div class="cv-parent">
+    {% if fi.parent.renseigne %}
+    <b>{{ fi.parent.nom or 'Nom non renseigné' }}</b>{% if fi.parent.telephone %} · <span>{{ fi.parent.telephone }}</span>{% endif %}
+    {% if fi.parent.adresse %}<div class="sous">Adresse de l'élève : {{ fi.parent.adresse }}</div>{% endif %}
+    {% else %}<span class="sous">La fiche de l'élève ne contient ni nom ni téléphone de parent ou tuteur (à compléter au Secrétariat).</span>{% endif %}
+    <div style="margin-top:6px">
+      {% if fi.comptes %}<span class="cv-etiq ENVOYEE">Notification possible</span>
+      <span class="sous">Application des parents : {{ fi.comptes|length }} compte{{ 's' if fi.comptes|length > 1 }} lié{{ 's' if fi.comptes|length > 1 }} ({{ fi.comptes|map(attribute='nom')|join(', ') }})</span>
+      {% else %}<span class="cv-etiq ANNULEE">Aucun compte parent actif</span>
+      <span class="sous">Le parent n'a pas encore activé l'application pour cet élève : la convocation ne pourra être qu'enregistrée en brouillon.</span>{% endif %}
+    </div>
+  </div>
+
+  <h3 style="margin:14px 0 4px;font-size:1rem">3. Motif de la convocation</h3>
+  <label for="cv-motif">Motif</label>
+  <input id="cv-motif" type="text" name="motif" maxlength="300" required value="{{ cv.form.get('motif', '') }}" placeholder="Ex. : absences répétées, comportement en classe, résultats...">
+
+  <h3 style="margin:14px 0 4px;font-size:1rem">4. Rendez-vous</h3>
+  <div class="cv-grille">
+    <div><label for="cv-date">Date</label><input id="cv-date" type="date" name="date_rdv" min="{{ cv.aujourdhui }}" required value="{{ cv.form.get('date_rdv', '') }}"></div>
+    <div><label for="cv-heure">Heure</label><input id="cv-heure" type="time" name="heure_rdv" required value="{{ cv.form.get('heure_rdv', '') }}"></div>
+    <div><label for="cv-lieu">Lieu</label><input id="cv-lieu" type="text" name="lieu" maxlength="100" value="{{ cv.form.get('lieu') if cv.form else cv.lieu_defaut }}"></div>
+  </div>
+
+  <h3 style="margin:14px 0 4px;font-size:1rem">5. Instructions complémentaires <span class="sous" style="font-weight:normal">(facultatif)</span></h3>
+  <textarea name="instructions" rows="3" maxlength="600" aria-label="Instructions complémentaires" placeholder="Ex. : se munir du carnet de l'élève et de la carte d'identité du parent.">{{ cv.form.get('instructions', '') }}</textarea>
+
+  <h3 style="margin:14px 0 4px;font-size:1rem">6. Envoi</h3>
+  <div class="ligne">
+    <button type="submit" name="envoyer" value="1">Enregistrer et envoyer au parent</button>
+    <button type="submit" class="clair" name="envoyer" value="0">Enregistrer sans envoyer</button>
+  </div>
+  <p class="sous" style="margin:6px 0 0">L'envoi se fait par notification dans l'application mobile du parent.</p>
+</form>
+{% if fi.deja %}
+<div class="espace"></div>
+<h3 class="sec">Convocations déjà faites pour cet élève cette année</h3>
+<div class="carte"><table class="tableau"><thead><tr><th>Rendez-vous</th><th>Motif</th><th>État</th><th></th></tr></thead><tbody>
+{% for x in fi.deja %}<tr><td>{{ x.date }} à {{ x.heure }}</td><td>{{ x.motif }}</td><td><span class="cv-etiq {{ x.statut }}">{{ x.statut_libelle }}</span></td>
+<td><a class="lien" href="{{ url_for('etudes_sous_menu', sous='direction_discipline', f='convocation', id=x.id) }}">Ouvrir</a></td></tr>{% endfor %}
+</tbody></table></div>
+{% endif %}
+{% endif %}
+
+{# ---------------------------------------------------------------- liste #}
+{% elif cv.liste %}
+{% set l = cv.liste %}
+<div class="chiffres">
+  <div class="chiffre"><b>{{ l.totaux.ENVOYEE }}</b><span>Envoyées</span></div>
+  <div class="chiffre"><b>{{ l.totaux.BROUILLON }}</b><span>Brouillons</span></div>
+  <div class="chiffre"><b>{{ l.totaux.ANNULEE }}</b><span>Annulées</span></div>
+</div>
+<form method="get" class="carte">
+  <input type="hidden" name="f" value="convocation"><input type="hidden" name="vue" value="liste">
+  <div class="ligne">
+    <select name="statut" aria-label="État"><option value="">Tous les états</option>{% for k, lib in l.statuts.items() %}<option value="{{ k }}" {{ 'selected' if cv.statut == k else '' }}>{{ lib }}</option>{% endfor %}</select>
+    <select name="classe" aria-label="Classe"><option value="">Toutes les classes</option>{% for k in cv.classes %}<option value="{{ k.n_classe }}" {{ 'selected' if cv.classe == k.n_classe|string else '' }}>{{ k.designation }}</option>{% endfor %}</select>
+    <input type="text" name="recherche" value="{{ cv.recherche }}" placeholder="Élève (nom ou matricule)" aria-label="Élève" style="flex:1;min-width:160px">
+    <button type="submit">Filtrer</button>
+  </div>
+</form>
+<div class="espace"></div>
+<div class="carte defile">
+{% if l.convocations %}
+<table class="tableau"><thead><tr><th>N°</th><th>Élève</th><th>Motif</th><th>Rendez-vous</th><th>État</th><th>Lue</th><th></th></tr></thead><tbody>
+{% for x in l.convocations %}
+<tr><td>{{ x.id }}</td><td><b>{{ x.eleve }}</b><div class="sous">{{ x.classe }}</div></td><td style="white-space:normal;min-width:180px">{{ x.motif }}</td>
+<td style="white-space:nowrap">{{ x.date }} à {{ x.heure }}</td><td><span class="cv-etiq {{ x.statut }}">{{ x.statut_libelle }}</span></td>
+<td>{% if x.statut == 'ENVOYEE' %}{{ x.nb_lues }}/{{ x.nb_destinataires }}{% else %}<span class="sous">-</span>{% endif %}</td>
+<td><a class="bouton clair" href="{{ url_for('etudes_sous_menu', sous='direction_discipline', f='convocation', id=x.id) }}">Ouvrir</a></td></tr>
+{% endfor %}</tbody></table>
+{% if l.tronque %}<p class="sous">Seules les convocations les plus récentes sont affichées : affinez les filtres.</p>{% endif %}
+{% else %}<p class="sous" style="margin:0">Aucune convocation pour ces critères (année {{ l.annee }}).</p>{% endif %}
+</div>
+
+{# ---------------------------------------------------------------- détail #}
+{% elif cv.detail %}
+{% set d = cv.detail %}
+<p style="margin:0 0 6px"><a class="lien" href="{{ url_for('etudes_sous_menu', sous='direction_discipline', f='convocation', vue='liste') }}">&larr; Convocations enregistrées</a></p>
+<div class="carte">
+  <h2 style="margin:0 0 6px;font-size:1.1rem">Convocation n° {{ d.id }} · {{ d.eleve }} <span class="cv-etiq {{ d.statut }}">{{ d.statut_libelle }}</span></h2>
+  <p class="sous" style="margin:0 0 8px">Enregistrée par {{ d.par }}, le {{ d.le }}.
+    {% if d.statut != 'BROUILLON' and d.envoyee_le %}Envoyée par {{ d.envoyee_par }}, le {{ d.envoyee_le }}.{% endif %}
+    {% if d.statut == 'ANNULEE' %}Annulée par {{ d.annulee_par }}, le {{ d.annulee_le }} : {{ d.motif_annulation }}.{% endif %}</p>
+  {% if d.destinataires %}
+  <p style="margin:0 0 4px"><b>Notification dans l'application :</b></p>
+  <ul style="margin:0 0 8px;padding-left:20px">{% for p in d.destinataires %}<li>{{ p.nom }} · {% if p.lue %}<span class="cv-etiq ENVOYEE">Lue</span>{% else %}<span class="cv-etiq BROUILLON">Pas encore lue</span>{% endif %}</li>{% endfor %}</ul>
+  {% elif d.statut == 'BROUILLON' %}<p class="sous">Pas encore envoyée.</p>{% endif %}
+  {% if d.passee and d.statut == 'BROUILLON' %}<p class="sous">La date du rendez-vous est passée : cette convocation ne peut plus être envoyée.</p>{% endif %}
+  <div class="ligne" style="margin-top:6px">
+    {% if d.peut_envoyer and cv.peut_envoyer %}
+    <form method="post" action="{{ url_for('etudes_convocation_action', action='envoyer') }}"><input type="hidden" name="id" value="{{ d.id }}"><button type="submit">Envoyer au parent</button></form>
+    {% endif %}
+    <a class="bouton clair" href="{{ url_for('etudes_convocation_impression', id_conv=d.id) }}" target="_blank" rel="noopener">Imprimer la lettre</a>
+  </div>
+  {% if d.statut != 'ANNULEE' and cv.peut_annuler %}
+  <details style="margin-top:10px"><summary style="cursor:pointer;color:var(--bleu);font-size:.9rem">Annuler cette convocation</summary>
+    <form method="post" action="{{ url_for('etudes_convocation_action', action='annuler') }}" class="ligne" style="margin-top:6px">
+      <input type="hidden" name="id" value="{{ d.id }}">
+      <input type="text" name="motif_annulation" maxlength="300" required placeholder="Motif de l'annulation" aria-label="Motif de l'annulation" style="flex:1;min-width:200px">
+      <button type="submit" class="clair">Annuler la convocation</button>
+    </form>
+  </details>
+  {% endif %}
+</div>
+<div class="espace"></div>
+<h3 class="sec">Lettre telle que le parent la reçoit</h3>
+{{ lettre(d.lettre) }}
+{% endif %}

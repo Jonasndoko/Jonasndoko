@@ -1,0 +1,22 @@
+{% extends "paiement_base.html" %}
+{% block contenu %}
+<div class="carte">
+  <div class="ligne" style="justify-content:space-between">
+    <div><b style="font-size:1.1rem">{{ nom }}</b><br><span class="sous" style="margin:0">Matricule {{ eleve.MATRICULE }}</span></div>
+    <a class="bouton second" href="/m/paiement/duplicata">Autre élève</a>
+  </div>
+  {% if recus %}
+  <div class="defile espace"><table class="tableau">
+    <tr><th>Reçu N°</th><th>Date</th><th>Année</th><th>Frais</th><th class="nb">Montant</th><th>Statut</th><th>Code parents</th><th></th></tr>
+    {% for r in recus %}
+    <tr>
+      <td>{{ r.n_recu }}</td><td style="white-space:nowrap">{{ r.quand }}</td><td>{{ r.annee }}</td><td>{{ r.frais }}</td><td class="nb">{{ r.montant }}</td>
+      <td><span class="badge {{ 'solde' if r.valide else 'impaye' }}">{{ "Valide" if r.valide else "Annulé" }}</span></td>
+      <td style="font-family:monospace;white-space:nowrap">{% if r.valide and r.code %}{{ r.code.code if not r.code.utilise else "déjà utilisé" }}{% endif %}</td>
+      <td>{% if r.valide %}<a class="bouton" style="padding:6px 12px" href="{{ url_for('paiement_recu_pdf', n_recu=r.n_recu, duplicata=1) }}" target="_blank" rel="noopener">Imprimer le duplicata</a>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table></div>
+  {% else %}<p class="sous" style="margin:12px 0 0">Aucun reçu enregistré pour cet élève.</p>{% endif %}
+</div>
+{% endblock %}

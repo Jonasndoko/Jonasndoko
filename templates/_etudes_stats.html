@@ -1,0 +1,47 @@
+{# Statistiques et rapports scolaires (statistiques_scolaires.py). Lecture seule. #}
+<style>
+.st-pills{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+.st-pills a{padding:5px 12px;border:1px solid var(--bord);border-radius:99px;text-decoration:none;color:var(--bleu);background:var(--carte);font-size:.88rem}
+.st-pills a.actif{background:var(--bleu);color:#fff;border-color:var(--bleu)}
+.st-filtre{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:end;margin:0 0 12px}
+.st-filtre>div{display:flex;flex-direction:column;gap:2px}.st-filtre label{margin:0;font-size:.8rem;color:var(--gris)}
+.st-filtre select{width:auto;padding:7px 9px}
+.st-chiffres{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:0 0 14px}
+.st-chiffre{background:var(--carte);border:1px solid var(--bord);border-radius:10px;padding:10px 14px}
+.st-chiffre b{display:block;font-size:1.3rem;line-height:1.2}.st-chiffre span{font-size:.78rem;color:var(--gris)}
+.st-defile{overflow-x:auto;border:1px solid var(--bord);border-radius:10px;padding:4px 8px;background:var(--carte);margin:0 0 10px}
+.st-sec{margin:18px 0 6px;font-size:1.02rem}
+.st-note{font-size:.85rem;color:var(--gris);margin:0 0 8px}
+.st-hausse{color:var(--vert);font-size:.78rem;white-space:nowrap}.st-baisse{color:var(--rouge);font-size:.78rem;white-space:nowrap}.st-egal{color:var(--gris);font-size:.78rem}
+.st-detail td{color:var(--gris);font-size:.88rem}
+tfoot td{font-weight:600}
+</style>
+{% set T = st %}
+{% if T.erreur %}<div class="erreur">{{ T.erreur }}</div>{% endif %}
+<nav class="st-pills" aria-label="Vues des statistiques">
+  {% for cle, lib in T.vues %}<a href="{{ url_for('etudes_sous_menu', sous='direction_etudes', f='statistiques', vue=cle, annee=T.annee or none) }}" class="{{ 'actif' if cle == T.vue else '' }}" {% if cle == T.vue %}aria-current="page"{% endif %}>{{ lib }}</a>{% endfor %}
+</nav>
+<form method="get" class="st-filtre" aria-label="Choisir les statistiques">
+  <input type="hidden" name="f" value="statistiques"><input type="hidden" name="vue" value="{{ T.vue }}">
+  <div><label for="st-annee">Année scolaire</label>
+    <select id="st-annee" name="annee">{% for a in T.annees %}<option value="{{ a }}" {{ 'selected' if a == T.annee else '' }}>{{ a }}</option>{% endfor %}</select></div>
+  {% if T.vue != 'comparaison' and T.portees %}
+  <div><label for="st-cle">Période, examen, semestre ou année</label>
+    <select id="st-cle" name="cle">{% for p in T.portees %}<option value="{{ p.cle }}" {{ 'selected' if p.cle == T.cle else '' }}>{{ p.libelle }}</option>{% endfor %}</select></div>
+  {% endif %}
+  {% if T.vue == 'comparaison' %}
+  <div><label for="st-niv">Comparer</label>
+    <select id="st-niv" name="niveau">{% for k, lib in T.niveaux.items() %}<option value="{{ k }}" {{ 'selected' if k == T.niveau else '' }}>{{ lib }}</option>{% endfor %}</select></div>
+  {% endif %}
+  {% if T.vue in ('moyennes', 'classement', 'comparaison') %}
+  <div><label for="st-classe">Classe</label>
+    <select id="st-classe" name="classe"><option value="">{{ 'Choisir une classe' if T.vue == 'classement' else 'Toutes les classes' }}</option>
+      {% for k in T.classes %}<option value="{{ k.n_classe }}" {{ 'selected' if k.n_classe|string == T.classe else '' }}>{{ k.designation }}{% if k.option %} · {{ k.option }}{% endif %}</option>{% endfor %}</select></div>
+  {% endif %}
+  <div><button type="submit">Afficher</button></div>
+</form>
+{% set pret = (T.vue == 'comparaison' and T.c) or (T.vue != 'comparaison' and T.s and T.s.ecole) %}
+{% if pret and not (T.vue == 'classement' and not T.classe) %}
+<p style="margin:0 0 10px"><a class="bouton second" target="_blank" rel="noopener" href="{{ url_for('etudes_stats_impression', vue=T.vue, annee=T.annee, cle=(T.cle if T.vue != 'comparaison' else none) or none, classe=T.classe or none, niveau=(T.niveau if T.vue == 'comparaison' else none)) }}">Imprimer</a></p>
+{% endif %}
+{% with vue=T.vue, s=T.s, c=T.c %}{% include "_etudes_stats_corps.html" %}{% endwith %}

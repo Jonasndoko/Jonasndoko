@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block titre %}Mot de passe oublié{% endblock %}
+{% block corps %}
+<form class="carte form" method="post" action="/mot-de-passe-oublie" autocomplete="off">
+  <h1>Mot de passe oublié</h1>
+  {% if fait %}
+  <div class="succes" role="status">Votre mot de passe a été changé.</div>
+  <p><a class="bouton plein" href="/connexion">Se connecter</a></p>
+  {% else %}
+  <p class="sous">Demandez un code de récupération à l'Administrateur : il vous le donne de vive voix et il ne dure que quelques minutes.</p>
+  {% if erreur %}<div class="erreur" role="alert">{{ erreur }}</div>{% endif %}
+  <label for="login">Identifiant</label><input id="login" name="login" value="{{ saisie.login }}" autocapitalize="none" required autofocus>
+  <label for="code">Code de récupération</label><input id="code" name="code" autocapitalize="characters" required>
+  <label for="nouveau">Nouveau mot de passe</label><input id="nouveau" name="nouveau" type="password" autocomplete="new-password" required>
+  <label for="confirmation">Confirmer le nouveau mot de passe</label><input id="confirmation" name="confirmation" type="password" autocomplete="new-password" required>
+  <button class="plein" type="submit">Changer mon mot de passe</button>
+  <p class="sous" style="margin-top:16px;text-align:center"><a class="lien" href="/connexion">Retour à la connexion</a></p>
+  {% endif %}
+</form>
+{% endblock %}

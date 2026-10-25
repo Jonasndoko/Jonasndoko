@@ -1,0 +1,30 @@
+{% extends "travaux_base.html" %}
+{% block contenu %}
+<div class="carte">
+  <h2 style="margin:0 0 12px;font-size:1.15rem">{{ 'Modifier' if modification else 'Ajouter' }} : {{ t.titre }}</h2>
+  <form method="post" action="{{ url_for('travaux_modifier_envoyer' if modification else 'travaux_nouveau_envoyer') }}">
+    <input type="hidden" name="t" value="{{ t.cle }}">{% if modification %}<input type="hidden" name="k" value="{{ k }}">{% endif %}
+    <div class="grille-form">
+    {% for c in champs %}
+      {% if c.type == 'oui_non' %}
+        <div><label class="case"><input type="checkbox" name="{{ c.nom }}" value="1" {{ 'checked' if c.valeur else '' }}> {{ c.libelle }}</label></div>
+      {% elif c.multiple %}
+        <div class="large"><label class="{{ 'obligatoire' if c.obligatoire else '' }}">{{ c.libelle }}</label>
+          <div class="liste-cases">{% for val, lib, choisi in c.options %}<label><input type="checkbox" name="{{ c.nom }}" value="{{ val }}" {{ 'checked' if choisi else '' }}> {{ lib }}</label>{% endfor %}</div></div>
+      {% elif c.type in ('choix', 'reference') %}
+        <div><label for="f-{{ c.nom }}" class="{{ 'obligatoire' if c.obligatoire else '' }}">{{ c.libelle }}</label>
+          <select id="f-{{ c.nom }}" name="{{ c.nom }}" {{ 'disabled' if c.fige else '' }} {{ 'required' if c.obligatoire else '' }}>
+            <option value="">— choisir —</option>
+            {% for val, lib, choisi in c.options %}<option value="{{ val }}" {{ 'selected' if choisi else '' }}>{{ lib }}</option>{% endfor %}
+          </select></div>
+      {% else %}
+        <div><label for="f-{{ c.nom }}" class="{{ 'obligatoire' if c.obligatoire else '' }}">{{ c.libelle }}</label>
+          <input id="f-{{ c.nom }}" name="{{ c.nom }}" type="{{ 'date' if c.type == 'date' else 'text' }}" value="{{ c.valeur }}" maxlength="{{ c.longueur if c.type not in ('date', 'tranches', 'montant') else 120 }}" {{ 'readonly' if c.fige else '' }} {{ 'required' if c.obligatoire and c.type != 'date' else '' }} autocomplete="off"></div>
+      {% endif %}
+    {% endfor %}
+    </div>
+    <div class="actions"><button type="submit">Enregistrer</button><a class="bouton second" href="{{ url_for('travaux_tables', t=t.cle) }}">Annuler</a></div>
+    <p class="sous" style="margin:10px 0 0">* obligatoire{% if modification %} · la clé d'une donnée (code, matricule…) ne se modifie pas après la création{% endif %}</p>
+  </form>
+</div>
+{% endblock %}

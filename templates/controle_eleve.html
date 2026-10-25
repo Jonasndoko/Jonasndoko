@@ -1,0 +1,39 @@
+{% extends "controle_base.html" %}
+{% block contenu %}
+<style>
+.statut{border-radius:10px;color:#fff;text-align:center;padding:18px 12px;display:flex;flex-direction:column;justify-content:center}
+.statut small{font-weight:700;letter-spacing:.08em}
+.statut strong{font-family:Georgia,serif;font-size:2.4rem;line-height:1.2}
+.statut.ordre{background:#1E7B34}.statut.impaye{background:#B3261E}.statut.noninscrit{background:#9A5B00}
+</style>
+<div class="ligne" style="justify-content:flex-end;margin-bottom:12px"><a class="bouton second" href="/m/controle/eleve">Autre élève</a></div>
+<div class="cols" style="gap:14px 16px;align-items:stretch">
+  <div class="carte">
+    <h2 style="margin:0 0 10px;font-size:1.05rem">Informations de l'élève</h2>
+    <dl class="infos" style="grid-template-columns:1fr 1fr">
+      <div><dt>Matricule</dt><dd>{{ r.matricule }}</dd></div>
+      <div><dt>Nom complet</dt><dd>{{ r.nom_complet }}{% if not r.actif %} <span class="badge impaye">compte désactivé</span>{% endif %}</dd></div>
+      <div><dt>Sexe</dt><dd>{{ r.sexe }}</dd></div>
+      <div><dt>Année scolaire</dt><dd>{{ r.annee or "—" }}</dd></div>
+      <div><dt>Classe</dt><dd>{{ r.classe or ("Non inscrit pour cette année" if r.annee else "—") }}</dd></div>
+      <div><dt>Option</dt><dd>{{ r.option or "—" }}</dd></div>
+    </dl>
+  </div>
+  <div class="statut {{ couleur }}" role="status"><small>STATUT</small><strong>{{ r.statut }}</strong><span style="font-weight:600;font-size:.9rem">{{ motif }}</span></div>
+</div>
+
+<div class="carte espace">
+  {% if r.lignes %}
+  <div class="defile"><table class="tableau">
+    <tr><th>Type de frais</th><th class="nb">Montant dû</th><th class="nb">Montant payé</th><th class="nb">Reste à payer</th><th>Situation</th></tr>
+    {% for l in r.lignes %}
+    <tr><td>{{ l.frais }}</td><td class="nb">{{ l.du }}</td><td class="nb">{{ l.paye }}</td><td class="nb">{{ l.reste }}</td>
+      <td><span class="badge {{ etiquettes.get(l.statut, 'impaye') }}">{{ l.statut }}</span></td></tr>
+    {% endfor %}
+  </table></div>
+  {% endif %}
+  {% if r.dettes %}<div class="erreur espace" role="alert" style="margin-bottom:0"><b>Reste à payer :</b> {{ r.dettes|join("  ;  ") }}</div>
+  {% elif r.sans_frais %}<div class="alerte" style="margin-bottom:0">Aucun frais n'est défini pour cette classe.</div>
+  {% elif not r.lignes %}<span class="sous">Aucune ligne de frais à afficher.</span>{% endif %}
+</div>
+{% endblock %}

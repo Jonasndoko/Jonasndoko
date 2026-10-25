@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block titre %}Traçabilité et audit{% endblock %}
+{% block entete %}
+{% if menu_utile %}<a class="bouton clair" href="/">Menu</a>{% endif %}
+<span style="font-size:.85rem">{{ s.nom_complet }} · {{ s.libelle_role }}</span>
+<form method="post" action="/deconnexion"><button class="clair" type="submit">Déconnexion</button></form>
+{% endblock %}
+{% block corps %}
+<style>
+main{max-width:1280px}
+button.petit,.bouton.petit{padding:6px 12px;font-size:.85rem}
+.filtres{background:var(--fond);border:1px solid var(--bord);border-radius:10px;padding:4px 14px 14px;margin:0 0 14px}
+.filtres .grille-f{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:0 14px;align-items:end}
+.filtres label.case-f{display:flex;align-items:center;gap:8px;color:var(--texte);margin:14px 0 4px}.case-f input{width:auto}
+.filtres .actions{margin-top:12px}
+.nb{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.rouge{color:var(--rouge);font-weight:600}.orange{color:#B25E09;font-weight:600}.gris{color:var(--gris)}
+.vert{color:var(--vert);font-weight:600}
+.resume{font-weight:600;color:var(--gris);margin:6px 0}
+.petit-texte{font-size:.8rem;color:var(--gris)}
+.onglets a{font-size:.85rem;padding:8px 11px}
+tr.alerte td{color:var(--rouge)}tr.financier td:nth-child(5){font-weight:600}
+.ligne-detail{word-break:break-word;max-width:520px}
+.nav-ancres{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.nav-ancres a{padding:4px 12px;border:1px solid var(--bord);border-radius:99px;text-decoration:none;color:var(--texte);font-size:.85rem}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .orange{color:#F2B067}:root:not([data-theme=light]) .rouge{color:#FFB4AB}}
+</style>
+<h1>Traçabilité et audit</h1>
+<p class="sous">Consultation seule : rien n'est modifié ici. Chaque ouverture, contrôle, recherche ciblée et exportation est elle-même inscrite au journal.</p>
+<nav class="onglets" aria-label="Fonctionnalités du module">
+  {% for c, lib, lien in onglets %}<a href="{{ lien }}" class="{{ 'actif' if c == onglet else '' }}">{{ lib }}</a>{% endfor %}
+</nav>
+{% if erreur %}<div class="erreur" role="alert">{{ erreur }}</div>{% endif %}
+{% block contenu %}{% endblock %}
+{% endblock %}

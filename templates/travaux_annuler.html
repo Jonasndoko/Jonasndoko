@@ -1,0 +1,13 @@
+{% extends "travaux_base.html" %}
+{% block contenu %}
+<div class="carte" style="max-width:640px">
+  <h2 style="margin:0 0 8px;font-size:1.15rem">Annuler le reçu {{ n_recu }}</h2>
+  <p class="sous">Il ne sera plus compté dans la situation de l'élève ni dans les rapports, et ne pourra plus être réimprimé. Cette opération est définitive ; le reçu lui-même n'est pas effacé.</p>
+  <form method="post" action="{{ url_for('travaux_annuler_recu') }}">
+    <input type="hidden" name="k" value="{{ k }}">
+    <label for="motif" class="obligatoire">Motif de l'annulation (5 caractères au moins)</label>
+    <input id="motif" name="motif" value="{{ motif }}" maxlength="200" required autofocus autocomplete="off">
+    <div class="actions"><button class="danger" type="submit">Annuler ce reçu</button><a class="bouton second" href="{{ url_for('travaux_tables', t='paiements') }}">Retour</a></div>
+  </form>
+</div>
+{% endblock %}

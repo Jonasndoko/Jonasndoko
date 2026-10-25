@@ -1,0 +1,44 @@
+{% extends "audit_base.html" %}
+{% from "_audit_macros.html" import date, choix %}
+{% block contenu %}
+<p class="sous">Vérifie les paiements et leurs reçus, les montants encaissés et remis, les annulations et corrections, et compare les opérations enregistrées aux rapports journaliers. Une anomalie n'est pas une preuve de fraude : elle indique où regarder.</p>
+<form method="get" class="filtres" action="{{ url_for('audit_financier_page') }}">
+  <input type="hidden" name="lancer" value="1">
+  <div class="grille-f">
+    {{ date('du', 'Du', v.du) }}{{ date('au', 'Au', v.au) }}
+    {{ choix('perc', 'Percepteur', percepteurs, v.perc, 'Tous les percepteurs') }}
+    {{ choix('devise', 'Devise', devises, v.devise, 'Toutes les devises') }}
+  </div>
+  <div class="actions">
+    <button type="submit">Lancer le contrôle</button>
+    <a class="bouton second" href="{{ url_for('audit_financier_page', du=aujourdhui, au=aujourdhui, lancer=1) }}">Aujourd'hui</a>
+    <a class="bouton second" href="{{ url_for('audit_financier_page') }}">Réinitialiser</a>
+    <span style="flex:1"></span>
+    <a class="bouton second petit" href="{{ url_for('audit_rapports_page', **q) }}">Rapport d'audit…</a>
+  </div>
+</form>
+{% if not c %}<p class="sous">Choisissez la période puis cliquez sur « Lancer le contrôle ».</p>
+{% else %}
+{% set nb = c.nb_anomalies %}{% set total = nb.values()|sum %}
+<div class="resume {{ 'rouge' if nb['ÉLEVÉE'] else ('orange' if total else 'vert') }}">
+  {% if total %}{{ total }} anomalie(s) : {{ nb['ÉLEVÉE'] }} élevée(s), {{ nb['MOYENNE'] }} moyenne(s), {{ nb['FAIBLE'] }} faible(s) — {% else %}Aucune anomalie : tout concorde — {% endif %}{{ c.paiements|length }} reçu(s) et {{ c.rapprochement|length }} journée(s) contrôlés</div>
+<div class="petit-texte {{ '' if c.journal.ok else 'rouge' }}">{% if c.journal.ok %}Journal : {{ c.journal.nb_lignes }} ligne(s), chaîne d'empreintes intacte{% else %}JOURNAL MODIFIÉ à partir de la ligne {{ c.journal.anomalie }} : conclusions à confirmer{% endif %}{% if c.apres_reinitialisation %} — les opérations antérieures à la dernière réinitialisation ne sont pas contrôlées{% endif %}</div>
+{% if c.synthese %}<div class="carte espace"><div class="defile"><table class="tableau">
+  <tr><th>Devise</th><th class="nb">Reçus</th><th class="nb">Total des reçus</th><th class="nb">Annulés</th><th class="nb">Encaissé</th><th class="nb">Versé</th><th class="nb">Écart de remise</th></tr>
+  {% for g in c.synthese %}<tr><td>{{ g.devise }}</td><td class="nb">{{ g.recus_nb }}</td><td class="nb">{{ f(g.recus_total) }}</td><td class="nb">{{ g.annules_nb }} ({{ f(g.annules_total) }})</td><td class="nb">{{ f(g.encaisse) }}</td><td class="nb">{{ f(g.verse) }}</td><td class="nb {{ 'orange' if g.ecart_remise else '' }}">{{ f(g.ecart_remise) }}</td></tr>{% endfor %}
+</table></div></div>{% endif %}
+<nav class="nav-ancres" aria-label="Tableaux du contrôle">{% for t in tables %}<a href="#t-{{ t.cle }}">{{ t.titre }} ({{ t.lignes|length }})</a>{% endfor %}</nav>
+{% for t in tables %}
+<h2 id="t-{{ t.cle }}" style="margin:18px 0 6px;font-size:1.1rem">{{ t.titre }} ({{ t.lignes|length }})</h2>
+{% if not t.lignes %}<p class="sous" style="font-style:italic;margin:0">Rien à signaler.</p>{% else %}
+<div class="carte"><div class="defile"><table class="tableau">
+  <tr>{% for titre, al in t.colonnes %}<th class="{{ 'nb' if al == 'd' else '' }}">{{ titre }}</th>{% endfor %}{% if t.cle != 'anomalies' and t.cle != 'corrections' %}<th>Remarques</th>{% endif %}{% if t.cle == 'anomalies' %}<th>Piste de vérification</th>{% endif %}</tr>
+  {% for valeurs, tag, constat in t.lignes[:limite_ecran] %}
+  <tr>{% for v in valeurs %}<td class="{{ 'nb' if t.colonnes[loop.index0][1] == 'd' else '' }} {{ tag }}">{{ v }}</td>{% endfor %}
+  {% if t.cle != 'corrections' %}<td class="petit-texte ligne-detail">{{ constat if (tag or t.cle == 'anomalies') else '' }}</td>{% endif %}</tr>{% endfor %}
+</table></div></div>
+{% if t.lignes|length > limite_ecran %}<p class="petit-texte" style="color:#B25E09;font-weight:600">{{ t.lignes|length }} ligne(s) : les {{ limite_ecran }} premières sont affichées. Utilisez « Rapport d'audit… » pour le PDF ou le CSV complet.</p>{% endif %}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% endblock %}

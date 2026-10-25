@@ -1,0 +1,39 @@
+{% extends "acces_base.html" %}
+{% block contenu %}
+<p class="sous">Les 8 postes de base de l'école et ceux que vous créez. Les droits de base d'un rôle sont donnés à tout nouveau compte de ce rôle, et quand un compte change de rôle.</p>
+<div class="deux">
+  <div>
+    <div class="carte"><div class="defile"><table class="tableau">
+      <tr><th>Rôle</th><th class="nb">Utilisateurs actifs</th><th>Droits de base</th><th></th></tr>
+      {% for r in roles %}<tr class="{{ 'choisi' if courant and courant.role == r.code else '' }}">
+        <td>{{ r.libelle }}</td><td class="nb">{{ r.nb }}</td><td style="font-size:.82rem">{{ r.resume }}</td>
+        <td><a class="bouton second petit" href="{{ url_for('acces_roles', r=r.code) }}">Droits</a></td></tr>{% endfor %}
+    </table></div></div>
+    <div class="carte espace">
+      <h2 style="margin:0 0 8px;font-size:1.05rem">Nouveau rôle</h2>
+      <form method="post" action="{{ url_for('acces_role_nouveau') }}">
+        <label for="r-lib" class="obligatoire">Nom du rôle (3 à 40 caractères)</label>
+        <input id="r-lib" name="libelle" value="{{ saisie.libelle }}" maxlength="40" required autocomplete="off">
+        <div class="actions"><button type="submit">Créer le rôle</button></div>
+      </form>
+    </div>
+  </div>
+  <div class="carte">
+    {% if courant %}
+    <h2 style="margin:0 0 10px;font-size:1.1rem">Droits de base : {{ courant.libelle }}</h2>
+    <form method="post" action="{{ url_for('acces_role_droits') }}">
+      <input type="hidden" name="r" value="{{ courant.role }}">
+      {% include "_acces_matrice.html" %}
+      <label class="case-ligne"><input type="checkbox" name="appliquer" value="1"> <span>Appliquer aussi aux comptes existants de ce rôle<br><small>(leurs autorisations personnelles sont remplacées)</small></span></label>
+      <div class="actions"><button type="submit" onclick="var a=this.form.appliquer.checked;return !a||confirm('Remplacer les autorisations de TOUS les comptes « {{ courant.libelle|replace("'", "’") }} » par ces droits de base ?')">Enregistrer les droits du rôle</button></div>
+    </form>
+    {% if not courant.de_base %}
+    <form method="post" action="{{ url_for('acces_role_supprimer') }}" onsubmit="return confirm('Supprimer le rôle « {{ courant.libelle|replace("'", "’") }} » ?')" style="margin-top:12px">
+      <input type="hidden" name="r" value="{{ courant.role }}"><button class="danger petit" type="submit">Supprimer le rôle</button>
+    </form>{% endif %}
+    {% else %}
+    <p class="sous" style="margin:0">Choisissez un rôle dans la liste (bouton « Droits ») pour régler ses droits de base.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

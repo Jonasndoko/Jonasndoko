@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block titre %}Mot de passe{% endblock %}
+{% block entete %}{% if not obligatoire %}<a class="bouton clair" href="/">Retour</a>{% endif %}{% endblock %}
+{% block corps %}
+<form class="carte form" method="post" action="/mot-de-passe">
+  <h1>Changer le mot de passe</h1>
+  <p class="sous">{% if obligatoire %}Votre mot de passe est provisoire : choisissez le vôtre pour continuer.{% else %}Compte : {{ s.login }}{% endif %}</p>
+  {% if erreur %}<div class="erreur" role="alert">{{ erreur }}</div>{% endif %}
+  <label for="ancien">Mot de passe actuel</label><input id="ancien" name="ancien" type="password" autocomplete="current-password" required>
+  <label for="nouveau">Nouveau mot de passe</label><input id="nouveau" name="nouveau" type="password" autocomplete="new-password" required>
+  <label for="confirmation">Confirmer</label><input id="confirmation" name="confirmation" type="password" autocomplete="new-password" required>
+  <button class="plein" type="submit">Enregistrer</button>
+</form>
+{% endblock %}

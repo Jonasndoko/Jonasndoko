@@ -1,0 +1,74 @@
+{% extends "paiement_base.html" %}
+{% block contenu %}
+<div class="carte">
+  <div class="ligne" style="justify-content:space-between">
+    <div><b style="font-size:1.1rem">{{ nom }}</b><br><span class="sous" style="margin:0">Matricule {{ eleve.MATRICULE }}</span></div>
+    <a class="bouton second" href="/m/paiement">Autre élève</a>
+  </div>
+  <dl class="infos espace">
+    <div><dt>Année scolaire</dt><dd>
+      <form method="get" class="ligne" style="margin:0"><select name="annee" aria-label="Année scolaire">
+        {% for a in annees %}<option value="{{ a }}" {{ 'selected' if a == annee else '' }}>{{ a }}</option>{% endfor %}
+      </select><button type="submit" class="second">Afficher</button></form></dd></div>
+    {% if insc %}
+    <div><dt>Classe</dt><dd>{{ insc.DESI_CLASSE }}</dd></div>
+    <div><dt>Niveau</dt><dd>{{ insc.DESI_NIVEAU }}</dd></div>
+    <div><dt>Option</dt><dd>{{ insc.DESI_OPTION or "— (pas encore en humanités)" }}</dd></div>
+    <div><dt>Statut</dt><dd>{{ statut_insc }}</dd></div>
+    {% else %}
+    <div><dt>Inscription</dt><dd>{% if annee %}Non inscrit pour l'année {{ annee }}{% else %}Aucune inscription{% endif %}</dd></div>
+    {% endif %}
+  </dl>
+</div>
+
+{% if dettes %}
+<div class="alerte espace" role="status"><b>⚠ Dette :</b>
+  {% for a, d, r in dettes %}année {{ a }} → {{ r|montant }} {{ d }}{{ " ; " if not loop.last }}{% endfor %}</div>
+{% else %}
+<div class="succes espace" role="status">✔ Aucune dette : l'élève est en règle.</div>
+{% endif %}
+{% if erreur %}<div class="erreur espace" role="alert">{{ erreur }}</div>{% endif %}
+
+<div class="carte espace">
+  <h2 style="margin:0 0 10px;font-size:1.05rem">Situation de l'année {{ annee }}</h2>
+  {% if lignes %}
+  <div class="defile"><table class="tableau">
+    <tr><th>Frais</th><th class="nb">Dû</th><th class="nb">Payé</th><th class="nb">Reste</th><th>Statut</th><th>Mode</th>{% if peut_payer_ici %}<th>Payer</th>{% endif %}</tr>
+    {% for l in lignes %}
+    <tr>
+      <td>{{ l.designation }}</td>
+      <td class="nb">{{ l.du|montant }} {{ l.devise }}</td>
+      <td class="nb">{{ l.paye|montant }} {{ l.devise }}</td>
+      <td class="nb">{{ l.reste|montant }} {{ l.devise }}</td>
+      <td><span class="badge {{ {'Soldé':'solde','Partiel':'partiel'}.get(l.statut, 'impaye') }}">{{ l.statut }}</span></td>
+      <td style="font-size:.8rem;color:var(--gris)">{{ l.mode }}</td>
+      {% if peut_payer_ici %}
+      <td>
+        {% if l.reste <= 0 %}—
+        {% elif l.tranches_mal_definies %}<span style="font-size:.8rem;color:var(--rouge)">Tranches non définies : voir l'Administrateur</span>
+        {% else %}
+        <form method="post" action="{{ url_for('paiement_confirmer', matricule=eleve.MATRICULE) }}">
+          <input type="hidden" name="annee" value="{{ annee }}"><input type="hidden" name="codtf" value="{{ l.codtf }}">
+          <input name="montant" value="{{ (l.prochain_montant or l.reste)|montant }}" inputmode="decimal" aria-label="Montant à payer, {{ l.designation }}" required>
+          <span style="font-size:.8rem">{{ l.devise }}</span>
+          <button type="submit">Payer</button>
+        </form>
+        {% endif %}
+      </td>
+      {% endif %}
+    </tr>
+    {% endfor %}
+  </table></div>
+  <p class="sous" style="margin:12px 0 0">
+    {% for dev, (du, paye, reste) in totaux.items() %}<b>Total {{ dev }}</b> : dû {{ du|montant }} · payé {{ paye|montant }} · reste {{ reste|montant }}{{ "   |   " if not loop.last }}{% endfor %}
+  </p>
+  {% elif insc %}<p class="sous" style="margin:0">Aucun frais défini pour cette classe.</p>
+  {% else %}<p class="sous" style="margin:0">Paiement impossible : l'élève n'est pas inscrit pour cette année.</p>{% endif %}
+  {% if peut_payer_ici %}
+  <p class="sous" style="margin:12px 0 0;font-size:.8rem">Frais payé par tranches : le montant proposé est le reste de la tranche en cours ; vous pouvez le modifier et payer moins (la tranche reste alors ouverte) ou plusieurs tranches d'un coup. Vous confirmerez avant l'enregistrement.</p>
+  {% elif not peut_payer %}
+  <p class="sous" style="margin:12px 0 0;font-size:.8rem">{{ motif_verrou }}</p>
+  {% endif %}
+</div>
+<div class="actions"><a class="bouton second" href="{{ url_for('paiement_duplicata_eleve', matricule=eleve.MATRICULE) }}">Reçus de cet élève (duplicata)</a></div>
+{% endblock %}

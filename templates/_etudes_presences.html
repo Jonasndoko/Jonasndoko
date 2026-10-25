@@ -1,0 +1,286 @@
+{# Direction de discipline > Gestion des présences : présences saisies par les professeurs, présence journalière, confirmer ou corriger, absences par classe et par élève. #}
+{% set pd = pd %}
+<style>
+.chiffres{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:10px;margin:0 0 14px}
+.chiffre{background:var(--carte);border:1px solid var(--bord);border-radius:10px;padding:12px 14px}
+.chiffre b{display:block;font-size:1.4rem;line-height:1.2}.chiffre span{font-size:.78rem;color:var(--gris)}
+.pd-etiq{display:inline-block;font-size:.75rem;font-weight:600;border:1px solid var(--bord);border-radius:20px;padding:1px 9px;margin-right:4px;white-space:nowrap}
+.pd-etiq.alerte{border-color:var(--rouge);color:var(--rouge)}
+.pd-action{margin:0 0 6px}
+.pd-action summary{cursor:pointer;color:var(--bleu);font-size:.85rem}
+.pd-action form{margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.pd-action input[type=text],.pd-action select{width:auto;min-width:130px;flex:1}
+</style>
+{% macro retour(pd) %}
+<input type="hidden" name="vue" value="{{ pd.vue }}"><input type="hidden" name="annee" value="{{ pd.annee }}"><input type="hidden" name="jour" value="{{ pd.jour }}">
+<input type="hidden" name="classe" value="{{ pd.classe }}"><input type="hidden" name="du" value="{{ pd.du }}"><input type="hidden" name="au" value="{{ pd.au }}">
+<input type="hidden" name="q" value="{{ pd.q }}"><input type="hidden" name="eleve" value="{{ pd.eleve }}">
+{% endmacro %}
+{% macro origine(x) %}
+{% if x.origine == 'CORRIGE' %}<span class="pd-etiq">Corrigé</span>{% elif x.origine == 'CONFIRME' %}<span class="pd-etiq">Confirmé</span>{% elif x.origine == 'PROFS' %}<span class="pd-etiq">Pointage des professeurs</span>{% endif %}
+{% if x.a_revoir %}<span class="pd-etiq alerte">À revoir : pointage modifié après la confirmation</span>{% endif %}
+{% if x.modifie_depuis %}<span class="pd-etiq alerte">Pointage modifié depuis la correction</span>{% endif %}
+{% endmacro %}
+
+{% if pd.erreur %}<div class="erreur">{{ pd.erreur }}</div>{% endif %}
+<div class="carte"><p class="sous" style="margin:0">Consultez les <b>présences saisies par les professeurs</b>, vérifiez la <b>présence journalière</b> des élèves, puis <b>confirmez</b> ou <b>corrigez</b> le statut selon les informations dont vous disposez. Les pointages des professeurs ne sont jamais modifiés : votre décision s'ajoute, avec un motif pour une correction. Un élève est présent pour la journée seulement s'il est présent à tous les cours pointés ce jour-là.</p></div>
+<div class="espace"></div>
+
+<nav class="onglets" aria-label="Vue">
+  {% for cle, lib in pd.vues %}
+  <a href="{{ url_for('etudes_sous_menu', sous='direction_discipline', f='presences', vue=cle, annee=pd.annee or None) }}" class="{{ 'actif' if pd.vue == cle else '' }}" {% if pd.vue == cle %}aria-current="page"{% endif %}>{{ lib }}</a>
+  {% endfor %}
+</nav>
+
+{# ---------------------------------------------------------------- présence du jour #}
+{% if pd.vue == 'jour' %}
+<form method="get" class="carte">
+  <input type="hidden" name="f" value="presences"><input type="hidden" name="vue" value="jour">
+  <div class="ligne">
+    <select name="annee" aria-label="Année scolaire">{% for a in pd.annees %}<option value="{{ a.annee }}" {{ 'selected' if pd.annee == a.annee else '' }}>Année {{ a.annee }}</option>{% endfor %}</select>
+    <input type="date" name="jour" value="{{ pd.jour or pd.aujourdhui }}" max="{{ pd.aujourdhui }}" aria-label="Jour">
+    <select name="classe" aria-label="Classe"><option value="">Toutes les classes</option>
+      {% for k in pd.classes %}<option value="{{ k.n_classe }}" {{ 'selected' if pd.classe == k.n_classe|string else '' }}>{{ k.designation }}</option>{% endfor %}</select>
+    <button type="submit">Afficher</button>
+  </div>
+</form>
+<div class="espace"></div>
+
+{% if pd.journee %}
+{% set j = pd.journee %}
+<h3 style="margin:0 0 8px">Présence du {{ j.date }}</h3>
+<div class="chiffres">
+  <div class="chiffre"><b>{{ j.totaux.effectif }}</b><span>Élèves</span></div>
+  <div class="chiffre"><b>{{ j.totaux.presents }}</b><span>Présents</span></div>
+  <div class="chiffre"><b>{{ j.totaux.absents }}</b><span>Absents</span></div>
+  <div class="chiffre"><b>{{ j.totaux.non_renseignes }}</b><span>Non renseignés</span></div>
+  <div class="chiffre"><b>{{ j.totaux.a_verifier }}</b><span>À vérifier</span></div>
+</div>
+<div class="carte defile">
+  {% if j.classes %}
+  <table class="tableau">
+    <thead><tr><th>Classe</th><th class="nb">Effectif</th><th class="nb">Présents</th><th class="nb">Absents</th><th class="nb">Non renseignés</th><th class="nb">Cours pointés</th><th class="nb">Décisions</th><th class="nb">À vérifier</th><th></th></tr></thead>
+    <tbody>
+    {% for c in j.classes %}
+    <tr>
+      <td><b>{{ c.classe }}</b>{% if c.option %}<div class="sous">{{ c.option }}</div>{% endif %}</td>
+      <td class="nb">{{ c.effectif }}</td><td class="nb">{{ c.presents }}</td><td class="nb">{{ c.absents }}</td><td class="nb">{{ c.non_renseignes }}</td><td class="nb">{{ c.cours_pointes }}</td>
+      <td class="nb">{{ c.confirmes + c.corriges }}</td>
+      <td class="nb">{% if c.a_verifier or c.partiels %}<b>{{ c.a_verifier }}</b>{% if c.partiels %}<div class="sous" style="white-space:normal;min-width:150px">dont {{ c.partiels }} absent(s) à certains cours seulement</div>{% endif %}{% else %}0{% endif %}</td>
+      <td><a class="bouton clair" href="{{ url_for('etudes_sous_menu', sous='direction_discipline', f='presences', vue='jour', annee=j.annee, jour=j.jour, classe=c.n_classe) }}">Ouvrir</a></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="sous" style="margin:0">Aucune classe avec des élèves inscrits pour cette année.</p>{% endif %}
+</div>
+{% if not j.classes or not j.totaux.effectif %}{% elif j.totaux.presents + j.totaux.absents == 0 %}<p class="sous">Aucun professeur n'a encore pointé les élèves ce jour-là.</p>{% endif %}
+
+{% elif pd.detail %}
+{% set d = pd.detail %}
+<p style="margin:0 0 6px"><a class="lien" href="{{ url_for('etudes_sous_menu', sous='direction_discipline', f='presences', vue='jour', annee=d.annee, jour=d.jour) }}">&larr; Toutes les classes</a></p>
+<h3 style="margin:0 0 8px">{{ d.classe }}{% if d.option %} <span class="sous">· {{ d.option }}</span>{% endif %} · {{ d.date }}</h3>
+<div class="chiffres">
+  <div class="chiffre"><b>{{ d.resume.effectif }}</b><span>Élèves</span></div>
+  <div class="chiffre"><b>{{ d.resume.presents }}</b><span>Présents</span></div>
+  <div class="chiffre"><b>{{ d.resume.absents }}</b><span>Absents</span></div>
+  <div class="chiffre"><b>{{ d.resume.non_renseignes }}</b><span>Non renseignés</span></div>
+  <div class="chiffre"><b>{{ d.resume.a_verifier }}</b><span>À vérifier</span></div>
+</div>
+
+<h3 class="sec">Présences saisies par les professeurs</h3>
+<div class="carte defile">
+  {% if d.saisies %}
+  <table class="tableau">
+    <thead><tr><th>Cours</th><th>Professeur</th><th class="nb">Présents</th><th class="nb">Absents</th><th class="nb">Non pointés</th><th>Saisi par</th></tr></thead>
+    <tbody>
+    {% for x in d.saisies %}
+    <tr><td><b>{{ x.cours }}</b></td><td>{{ x.professeur }}</td><td class="nb">{{ x.presents }}</td><td class="nb">{{ x.absents }}</td><td class="nb">{{ x.non_pointes }}</td>
+      <td class="sous">{{ x.par }}{% if x.le %} · {{ x.le }}{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="sous" style="margin:0">Aucun professeur n'a pointé cette classe ce jour-là.</p>{% endif %}
+</div>
+
+<h3 class="sec">Présence journalière des élèves</h3>
+{% if pd.peut_decider and d.modifiable and d.resume.a_verifier %}
+<form method="post" action="{{ url_for('etudes_presences_action', action='confirmer_classe') }}" style="margin:0 0 10px">
+  {{ retour(pd) }}
+  <button type="submit">Confirmer les {{ d.resume.a_verifier }} présence(s) à vérifier</button>
+  <span class="sous">Confirme le statut tiré des pointages ; les élèves non pointés ou déjà décidés ne sont pas touchés.</span>
+</form>
+{% endif %}
+{% if not d.modifiable %}<p class="sous">Consultation seule : on ne confirme ni ne corrige que les jours de classe de l'année en cours.</p>{% elif not pd.peut_decider %}<p class="sous">Vous pouvez consulter les présences, mais pas les confirmer ni les corriger : le droit « Ajout » ne vous est pas accordé.</p>{% endif %}
+<div class="carte defile">
+  <table class="tableau">
+    <thead><tr><th>Matricule</th><th>Élève</th><th>Pointages des professeurs</th><th>Statut retenu</th><th></th></tr></thead>
+    <tbody>
+    {% for e in d.eleves %}
+    <tr>
+      <td>{{ e.matricule }}</td>
+      <td>{{ e.nom_complet }}</td>
+      <td class="sous">
+        {% if e.pointes %}
+          {% if e.manques %}Absent à : {{ e.manques|join(', ') }} <b>({{ e.manques|length }} sur {{ e.pointes }} cours pointés)</b>{% else %}Présent à {{ e.pointes }} cours pointé(s){% endif %}
+          {% if e.partiel %}<div><span class="pd-etiq alerte">Absent à certains cours seulement</span></div>{% endif %}
+        {% else %}Non pointé{% endif %}
+      </td>
+      <td>
+        <b>{{ pd.statuts[e.statut] }}</b><br>{{ origine(e) }}
+        {% if e.decision and e.decision.motif %}<div class="sous">{{ e.decision.motif }} · {{ e.decision.par }}, {{ e.decision.le }}</div>{% endif %}
+      </td>
+      <td>
+        {% if pd.peut_decider and d.modifiable %}
+          {% if e.pointes and e.origine not in ('CONFIRME', 'CORRIGE') %}
+          <form method="post" action="{{ url_for('etudes_presences_action', action='confirmer') }}" class="pd-action">
+            {{ retour(pd) }}<input type="hidden" name="matricule" value="{{ e.matricule }}"><button type="submit">Confirmer</button>
+          </form>
+          {% endif %}
+          <details class="pd-action"><summary>Corriger</summary>
+            <form method="post" action="{{ url_for('etudes_presences_action', action='corriger') }}">
+              {{ retour(pd) }}<input type="hidden" name="matricule" value="{{ e.matricule }}">
+              <select name="statut" aria-label="Statut retenu">
+                <option value="P" {{ 'selected' if e.statut != 'P' else '' }}>Présent</option><option value="A" {{ 'selected' if e.statut == 'P' else '' }}>Absent</option>
+              </select>
+              <input type="text" name="motif" maxlength="300" required placeholder="Motif (ex. justificatif reçu)" aria-label="Motif">
+              <button type="submit">Enregistrer</button>
+            </form>
+          </details>
+        {% endif %}
+        {% if pd.peut_annuler and d.modifiable and e.decision %}
+          <details class="pd-action"><summary>Annuler la décision</summary>
+            <form method="post" action="{{ url_for('etudes_presences_action', action='annuler') }}">
+              {{ retour(pd) }}<input type="hidden" name="id" value="{{ e.decision.id }}">
+              <input type="text" name="motif_annulation" maxlength="300" required placeholder="Motif de l'annulation" aria-label="Motif de l'annulation">
+              <button type="submit" class="clair">Annuler</button>
+            </form>
+          </details>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{# ---------------------------------------------------------------- absences par classe #}
+{% elif pd.vue == 'classe' %}
+<form method="get" class="carte">
+  <input type="hidden" name="f" value="presences"><input type="hidden" name="vue" value="classe">
+  <div class="ligne">
+    <select name="annee" aria-label="Année scolaire">{% for a in pd.annees %}<option value="{{ a.annee }}" {{ 'selected' if pd.annee == a.annee else '' }}>Année {{ a.annee }}</option>{% endfor %}</select>
+    <select name="classe" aria-label="Classe" required><option value="">Choisir une classe</option>
+      {% for k in pd.classes %}<option value="{{ k.n_classe }}" {{ 'selected' if pd.classe == k.n_classe|string else '' }}>{{ k.designation }}</option>{% endfor %}</select>
+    <label class="sous" style="margin:0">Du <input type="date" name="du" value="{{ pd.du }}" max="{{ pd.aujourdhui }}"></label>
+    <label class="sous" style="margin:0">au <input type="date" name="au" value="{{ pd.au }}" max="{{ pd.aujourdhui }}"></label>
+    <button type="submit">Afficher</button>
+  </div>
+  <p class="sous" style="margin:6px 0 0">Sans dates : de la rentrée à aujourd'hui.</p>
+</form>
+<div class="espace"></div>
+{% if pd.absences %}
+{% set a = pd.absences %}
+<h3 style="margin:0 0 8px">Absences de {{ a.classe }} du {{ a.debut_fr }} au {{ a.fin_fr }}</h3>
+<div class="chiffres">
+  <div class="chiffre"><b>{{ a.jours_pointes }}</b><span>Jours pointés</span></div>
+  <div class="chiffre"><b>{{ a.total_absences }}</b><span>Journées d'absence (total)</span></div>
+  <div class="chiffre"><b>{{ a.eleves|selectattr('repetee')|list|length }}</b><span>Absences répétées ({{ a.seuil }} jours ou plus)</span></div>
+</div>
+<div class="carte defile">
+  <table class="tableau">
+    <thead><tr><th>Matricule</th><th>Élève</th><th class="nb">Jours présents</th><th class="nb">Jours absents</th><th class="nb">Taux de présence</th><th>Dates d'absence</th></tr></thead>
+    <tbody>
+    {% for e in a.eleves %}
+    <tr>
+      <td>{{ e.matricule }}</td>
+      <td><a class="lien" href="{{ url_for('etudes_sous_menu', sous='direction_discipline', f='presences', vue='eleve', annee=a.annee, eleve=e.matricule, du=pd.du or None, au=pd.au or None) }}">{{ e.nom_complet }}</a>{% if e.repetee %} <span class="pd-etiq alerte">Absences répétées</span>{% endif %}</td>
+      <td class="nb">{{ e.jours_presents }}</td><td class="nb">{% if e.jours_absents %}<b>{{ e.jours_absents }}</b>{% else %}0{% endif %}</td>
+      <td class="nb">{{ ('%s %%'|format(e.taux|string|replace('.', ','))) if e.taux is not none else '-' }}</td>
+      <td class="sous">{{ e.dates_absence|join(', ') if e.dates_absence else '-' }}{% if e.corriges %} · {{ e.corriges }} jour(s) corrigé(s){% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="sous">Les jours comptés sont ceux où un professeur a pointé la classe ou où vous avez pris une décision ; le statut retenu tient compte de vos confirmations et corrections.</p>
+{% elif not pd.erreur %}<div class="carte"><p class="sous" style="margin:0">Choisissez une classe pour voir ses absences.</p></div>{% endif %}
+
+{# ---------------------------------------------------------------- absences par élève #}
+{% else %}
+<form method="get" class="carte">
+  <input type="hidden" name="f" value="presences"><input type="hidden" name="vue" value="eleve">
+  <div class="ligne">
+    <select name="annee" aria-label="Année scolaire">{% for a in pd.annees %}<option value="{{ a.annee }}" {{ 'selected' if pd.annee == a.annee else '' }}>Année {{ a.annee }}</option>{% endfor %}</select>
+    <input type="search" name="q" value="{{ pd.q }}" placeholder="Nom, postnom, prénom ou matricule" aria-label="Rechercher un élève">
+    <button type="submit">Rechercher</button>
+  </div>
+</form>
+<div class="espace"></div>
+{% if pd.recherche %}
+<div class="carte defile">
+  {% if pd.recherche.eleves %}
+  <table class="tableau">
+    <thead><tr><th>Matricule</th><th>Élève</th><th>Classe</th><th></th></tr></thead>
+    <tbody>
+    {% for e in pd.recherche.eleves %}
+    <tr><td>{{ e.matricule }}</td><td>{{ e.nom_complet }}</td><td>{{ e.classe }}</td>
+      <td><a class="bouton clair" href="{{ url_for('etudes_sous_menu', sous='direction_discipline', f='presences', vue='eleve', annee=pd.annee, eleve=e.matricule) }}">Voir les absences</a></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if pd.recherche.tronque %}<p class="sous">Seuls les premiers élèves sont affichés : affinez la recherche.</p>{% endif %}
+  {% else %}<p class="sous" style="margin:0">Aucun élève ne correspond.</p>{% endif %}
+</div>
+{% elif pd.fiche %}
+{% set f = pd.fiche %}
+<h3 style="margin:0 0 4px">{{ f.eleve.nom_complet }}</h3>
+<p class="sous" style="margin:0 0 10px">{{ f.eleve.matricule }} · {{ f.classe }} · du {{ f.debut_fr }} au {{ f.fin_fr }}</p>
+<form method="get" class="carte" style="margin-bottom:12px">
+  <input type="hidden" name="f" value="presences"><input type="hidden" name="vue" value="eleve"><input type="hidden" name="annee" value="{{ f.annee }}"><input type="hidden" name="eleve" value="{{ f.eleve.matricule }}">
+  <div class="ligne">
+    <label class="sous" style="margin:0">Du <input type="date" name="du" value="{{ pd.du }}" max="{{ pd.aujourdhui }}"></label>
+    <label class="sous" style="margin:0">au <input type="date" name="au" value="{{ pd.au }}" max="{{ pd.aujourdhui }}"></label>
+    <button type="submit">Changer la période</button>
+  </div>
+</form>
+<div class="chiffres">
+  <div class="chiffre"><b>{{ f.jours_presents }}</b><span>Jours présents</span></div>
+  <div class="chiffre"><b>{{ f.jours_absents }}</b><span>Jours absents</span></div>
+  <div class="chiffre"><b>{{ ('%s %%'|format(f.taux|string|replace('.', ','))) if f.taux is not none else '-' }}</b><span>Taux de présence</span></div>
+  <div class="chiffre"><b>{{ f.jours_corriges }}</b><span>Jours corrigés</span></div>
+</div>
+<div class="carte defile">
+  {% if f.absences %}
+  <table class="tableau">
+    <thead><tr><th>Date</th><th>Cours manqués</th><th>Statut retenu</th><th>Décision de la Direction</th></tr></thead>
+    <tbody>
+    {% for x in f.absences %}
+    <tr>
+      <td>{{ x.date }}</td>
+      <td class="sous">{% if x.manques %}{{ x.manques|join(', ') }} ({{ x.manques|length }} sur {{ x.pointes }}){% else %}-{% endif %}</td>
+      <td>{{ origine(x) }}</td>
+      <td class="sous">{% if x.decision %}{{ x.decision.genre_libelle }} le {{ x.decision.le }} par {{ x.decision.par }}{% if x.decision.motif %} : {{ x.decision.motif }}{% endif %}{% else %}-{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="sous" style="margin:0">Aucune absence sur cette période.</p>{% endif %}
+</div>
+{% if f.historique %}
+<h3 class="sec">Décisions de la Direction sur cette période</h3>
+<div class="carte defile">
+  <table class="tableau">
+    <thead><tr><th>Jour</th><th>Décision</th><th>Motif</th><th>Par</th><th>État</th></tr></thead>
+    <tbody>
+    {% for h in f.historique %}
+    <tr {% if h.annulee %}style="opacity:.65"{% endif %}><td>{{ h.date }}</td><td>{{ h.genre }} : {{ h.statut }}</td><td class="sous">{{ h.motif or '-' }}</td><td class="sous">{{ h.par }}, {{ h.le }}</td>
+      <td class="sous">{% if h.annulee %}Annulée{% if h.motif_annulation %} : {{ h.motif_annulation }}{% endif %}{% else %}En vigueur{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% elif not pd.erreur %}<div class="carte"><p class="sous" style="margin:0">Cherchez un élève par son nom ou son matricule pour voir ses absences.</p></div>{% endif %}
+{% endif %}

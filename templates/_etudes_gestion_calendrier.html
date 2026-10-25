@@ -1,0 +1,75 @@
+<p class="sous">L'année scolaire, ses {{ mot }}s et leurs périodes. Les {{ mot }}s restent dans les dates de l'année, les périodes dans celles de leur {{ mot }}, sans chevauchement.</p>
+<div class="carte">
+  <h2 style="margin:0 0 10px;font-size:1.1rem">Années scolaires</h2>
+  <div class="defile"><table class="tableau">
+    <tr><th>Année</th><th>Dates</th><th>État</th><th class="nb">Semestres</th><th></th></tr>
+    {% for x in annees %}<tr class="{{ 'inactif' if not x.actif else '' }}"><td><b>{{ x.annee }}</b></td>
+      <td>{{ (x.debut ~ ' - ' ~ x.fin) if x.avec_dates else 'dates à définir' }}</td>
+      <td>{% if x.en_cours %}<span class="badge encours">En cours</span>{% endif %}</td><td class="nb">{{ x.nb_semestres }}</td>
+      <td>{% if x.annee != a %}<a class="bouton second petit" href="{{ url_for('etudes_sous_menu', sous='direction_etudes', f='calendrier', a=x.annee, s=section) }}">Choisir</a>{% else %}<span class="badge avenir">Affichée</span>{% endif %}</td></tr>
+    {% else %}<tr><td colspan="5" class="sous">Aucune année scolaire.</td></tr>{% endfor %}
+  </table></div>
+  {% if d.ajout %}
+  <form method="post" action="{{ url_for('gestion_annee_creer') }}" class="grille-form" style="margin-top:14px">
+    <input type="hidden" name="s" value="{{ section }}">
+    <div><label for="na" class="obligatoire">Nouvelle année (ex. 2027-2028)</label><input id="na" name="annee" maxlength="9" required></div>
+    <div><label for="nd" class="obligatoire">Début de l'année</label><input id="nd" name="debut" type="date" required></div>
+    <div><label for="nf" class="obligatoire">Fin de l'année</label><input id="nf" name="fin" type="date" required></div>
+    <div style="align-self:end"><button type="submit">Créer l'année</button></div>
+  </form>{% endif %}
+</div>
+
+{% if a and cal %}
+<div class="carte espace">
+  <h2 style="margin:0 0 10px;font-size:1.1rem">Année {{ a }}</h2>
+  {% if d.modif %}
+  <div class="ligne-actions">
+    <form method="post" action="{{ url_for('gestion_annee_dates') }}" class="ligne"><input type="hidden" name="a" value="{{ a }}"><input type="hidden" name="s" value="{{ section }}">
+      <input name="debut" type="date" value="{{ cal.debut|en_iso }}" aria-label="Début" required style="width:auto"> <input name="fin" type="date" value="{{ cal.fin|en_iso }}" aria-label="Fin" required style="width:auto">
+      <button class="second" type="submit">Enregistrer les dates</button></form>
+    <form method="post" action="{{ url_for('gestion_annee_en_cours') }}"><input type="hidden" name="a" value="{{ a }}"><input type="hidden" name="s" value="{{ section }}"><button class="second" type="submit">Définir comme année en cours</button></form>
+  </div>{% endif %}
+</div>
+
+<div class="carte espace">
+  <nav class="tables" aria-label="Section" style="display:flex;gap:6px;margin:0 0 12px">
+    {% for code, lib in sections %}<a href="{{ url_for('etudes_sous_menu', sous='direction_etudes', f='calendrier', a=a, s=code) }}" class="{{ 'actif' if code == section else '' }}" style="padding:6px 12px;border:1px solid var(--bord);border-radius:99px;text-decoration:none;{{ 'background:var(--bleu);color:#fff' if code == section else 'color:var(--texte)' }}">{{ lib }}</a>{% endfor %}
+  </nav>
+  <h2 style="margin:0 0 10px;font-size:1.1rem">{{ mot|capitalize }}s et périodes de {{ a }}</h2>
+  {% if d.ajout %}
+  <form method="post" action="{{ url_for('gestion_structure_standard') }}" style="margin-bottom:12px" onsubmit="return confirm('Créer la structure standard (dates réparties automatiquement) ?')">
+    <input type="hidden" name="a" value="{{ a }}"><input type="hidden" name="s" value="{{ section }}"><button class="second" type="submit">Créer la structure standard</button></form>{% endif %}
+  <div class="defile"><table class="tableau">
+    <tr><th>{{ mot|capitalize }} / période</th><th>Début</th><th>Fin</th><th>Actions</th></tr>
+    {% for sem in cal.semestres %}
+    <tr><td><b>{{ sem.libelle }}</b></td><td>{{ sem.debut }}</td><td>{{ sem.fin }}</td>
+      <td style="white-space:nowrap">
+        {% if d.modif %}<details class="corriger" style="display:inline-block"><summary>Modifier</summary><div class="carte"><form method="post" action="{{ url_for('gestion_calendrier_modifier') }}" class="grille-form">
+          <input type="hidden" name="genre" value="S"><input type="hidden" name="id" value="{{ sem.id }}"><input type="hidden" name="a" value="{{ a }}"><input type="hidden" name="s" value="{{ section }}">
+          <div><label>Nom</label><input name="libelle" value="{{ sem.libelle }}" required></div><div><label>Début</label><input name="debut" type="date" value="{{ sem.debut|en_iso }}" required></div><div><label>Fin</label><input name="fin" type="date" value="{{ sem.fin|en_iso }}" required></div>
+          <div style="align-self:end"><button type="submit" class="petit">Enregistrer</button></div></form></div></details>{% endif %}
+        {% if d.ajout %}<details class="corriger" style="display:inline-block"><summary>Ajouter une période</summary><div class="carte"><form method="post" action="{{ url_for('gestion_periode_ajouter') }}" class="grille-form">
+          <input type="hidden" name="id_sem" value="{{ sem.id }}"><input type="hidden" name="a" value="{{ a }}"><input type="hidden" name="s" value="{{ section }}">
+          <div><label>Nom</label><input name="libelle" required></div><div><label>Début</label><input name="debut" type="date" required></div><div><label>Fin</label><input name="fin" type="date" required></div>
+          <div style="align-self:end"><button type="submit" class="petit">Ajouter</button></div></form></div></details>{% endif %}
+        {% if d.suppr %}<form method="post" action="{{ url_for('gestion_calendrier_supprimer') }}" onsubmit="return confirm('Supprimer « {{ sem.libelle|replace("'", "’") }} » ? Il doit d\'abord ne plus contenir de périodes.')"><input type="hidden" name="genre" value="S"><input type="hidden" name="id" value="{{ sem.id }}"><input type="hidden" name="a" value="{{ a }}"><input type="hidden" name="s" value="{{ section }}"><button class="danger petit" type="submit">Supprimer</button></form>{% endif %}
+      </td></tr>
+      {% for p in sem.periodes %}
+      <tr><td style="padding-left:28px">{{ p.libelle }}</td><td>{{ p.debut }}</td><td>{{ p.fin }}</td>
+        <td style="white-space:nowrap">
+          {% if d.modif %}<details class="corriger" style="display:inline-block"><summary>Modifier</summary><div class="carte"><form method="post" action="{{ url_for('gestion_calendrier_modifier') }}" class="grille-form">
+            <input type="hidden" name="genre" value="P"><input type="hidden" name="id" value="{{ p.id }}"><input type="hidden" name="a" value="{{ a }}"><input type="hidden" name="s" value="{{ section }}">
+            <div><label>Nom</label><input name="libelle" value="{{ p.libelle }}" required></div><div><label>Début</label><input name="debut" type="date" value="{{ p.debut|en_iso }}" required></div><div><label>Fin</label><input name="fin" type="date" value="{{ p.fin|en_iso }}" required></div>
+            <div style="align-self:end"><button type="submit" class="petit">Enregistrer</button></div></form></div></details>{% endif %}
+          {% if d.suppr %}<form method="post" action="{{ url_for('gestion_calendrier_supprimer') }}" onsubmit="return confirm('Supprimer « {{ p.libelle|replace("'", "’") }} » ?')"><input type="hidden" name="genre" value="P"><input type="hidden" name="id" value="{{ p.id }}"><input type="hidden" name="a" value="{{ a }}"><input type="hidden" name="s" value="{{ section }}"><button class="danger petit" type="submit">Supprimer</button></form>{% endif %}
+        </td></tr>
+      {% endfor %}
+    {% else %}<tr><td colspan="4" class="sous">Aucun {{ mot }} pour cette section : créez la structure standard ou ajoutez-en un.</td></tr>{% endfor %}
+  </table></div>
+  {% if d.ajout %}
+  <h3 style="margin:16px 0 6px;font-size:1rem">Ajouter un {{ mot }}</h3>
+  <form method="post" action="{{ url_for('gestion_semestre_ajouter') }}" class="grille-form"><input type="hidden" name="a" value="{{ a }}"><input type="hidden" name="s" value="{{ section }}">
+    <div><label for="sl" class="obligatoire">Nom</label><input id="sl" name="libelle" required></div><div><label for="sd" class="obligatoire">Début</label><input id="sd" name="debut" type="date" required></div><div><label for="sf" class="obligatoire">Fin</label><input id="sf" name="fin" type="date" required></div>
+    <div style="align-self:end"><button type="submit">Ajouter le {{ mot }}</button></div></form>{% endif %}
+</div>
+{% endif %}

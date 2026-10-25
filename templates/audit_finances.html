@@ -1,0 +1,36 @@
+{% extends "audit_base.html" %}
+{% from "_audit_macros.html" import date, texte, choix, exporter %}
+{% block contenu %}
+<form method="get" class="filtres" action="{{ url_for('audit_finances') }}">
+  <div class="grille-f">
+    {{ texte('eleve', 'Élève (nom ou matricule)', v.eleve) }}{{ texte('recu', 'N° de reçu', v.recu) }}
+    {{ choix('u', 'Utilisateur', utilisateurs, v.u, 'Tous les utilisateurs') }}
+    {{ choix('type', 'Opération', types.items(), v.type, 'Toutes les opérations') }}
+    {{ date('du', 'Du', v.du) }}{{ date('au', 'Au', v.au) }}
+  </div>
+  <label class="case-f"><input type="checkbox" name="ecart" value="1" {{ 'checked' if v.ecart == '1' else '' }}> Écarts seulement</label>
+  <div class="actions">
+    <button type="submit">Rechercher</button><a class="bouton second" href="{{ url_for('audit_finances') }}">Réinitialiser</a>
+    <span style="flex:1"></span>{{ exporter('historique', q) }}
+  </div>
+</form>
+{% if r %}
+{% if r.totaux %}<div class="carte" style="margin-bottom:12px"><div class="defile"><table class="tableau">
+  <tr><th>Devise</th><th class="nb">Paiements</th><th class="nb">Annulations</th><th class="nb">Net des paiements</th><th class="nb">Encaissé</th><th class="nb">Versé</th><th class="nb">Écart (encaissé - versé)</th></tr>
+  {% for t in r.totaux %}<tr><td>{{ t.devise }}</td><td class="nb">{{ f(t.paiements) }} ({{ t.paiements_nb }})</td><td class="nb">{{ f(t.annulations) }} ({{ t.annulations_nb }})</td>
+    <td class="nb">{{ f(t.net) }}</td><td class="nb">{{ f(t.encaisse) }} ({{ t.encaissements_nb }})</td><td class="nb">{{ f(t.verse) }}</td><td class="nb {{ 'orange' if t.ecart else '' }}">{{ f(t.ecart) }}</td></tr>{% endfor %}
+</table></div></div>{% endif %}
+<div class="resume">{% if r.total %}{{ r.total }} opération(s) trouvée(s){% else %}Aucune opération trouvée{% endif %}{% if r.total > r.operations|length %} — les {{ r.operations|length }} plus récentes sont affichées : exportez pour tout obtenir{% endif %}</div>
+<div class="carte"><div class="defile"><table class="tableau">
+  <tr><th>Date et heure</th><th>Opération</th><th>Référence</th><th>Élève</th><th>Détail</th><th class="nb">Montant</th><th class="nb">Versé</th><th class="nb">Écart</th><th>Devise</th><th>Fait par</th><th>Statut</th></tr>
+  {% for o in r.operations %}
+  <tr class="{{ 'inactif' if o.type in ('ANNULATION', 'ENC_SUPPRIME') else '' }}">
+    <td style="white-space:nowrap">{{ o.date_txt }}</td><td>{{ o.type_txt }}</td>
+    <td>{% if o.reference and o.reference != 'ENC-?' %}<a class="lien" href="{{ url_for('audit_fiche', ref=o.reference, retour=request.full_path) }}">{{ o.reference }}</a>{% else %}{{ o.reference or '—' }}{% endif %}</td>
+    <td>{{ o.eleve or '—' }}</td><td class="ligne-detail">{{ o.detail }}</td><td class="nb">{{ o.montant_txt }}</td><td class="nb">{{ o.verse_txt }}</td>
+    <td class="nb {{ 'orange' if o.ecart else '' }}">{{ o.ecart_txt }}</td><td>{{ o.devise }}</td><td>{{ o.par_login or '—' }}</td><td>{{ o.statut }}</td></tr>
+  {% else %}<tr><td colspan="11" class="sous">Aucune opération.</td></tr>{% endfor %}
+</table></div></div>
+<p class="petit-texte">Cliquez sur une référence pour voir qui a fait l'opération, quand, et toutes ses traces au journal.</p>
+{% endif %}
+{% endblock %}

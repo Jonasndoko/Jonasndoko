@@ -1,0 +1,110 @@
+{# Présences et heures des professeurs : consultation seule (heures_profs.py) #}
+<style>
+.chiffres{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:10px;margin:0 0 14px}
+.chiffre{background:var(--carte);border:1px solid var(--bord);border-radius:10px;padding:12px 14px}
+.chiffre b{display:block;font-size:1.4rem;line-height:1.2}.chiffre span{font-size:.78rem;color:var(--gris)}
+.chiffre.vert b{color:var(--vert)}.chiffre.rouge b{color:var(--rouge)}
+.filtre-h{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:end;margin:0 0 10px}
+.filtre-h>div{display:flex;flex-direction:column;gap:2px}
+.filtre-h label{margin:0;font-size:.8rem;color:var(--gris)}
+.filtre-h select,.filtre-h input{width:auto;padding:7px 9px}
+.raccourcis{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;font-size:.85rem}
+.raccourcis a{padding:3px 10px;border:1px solid var(--bord);border-radius:99px;text-decoration:none;color:var(--bleu);background:var(--carte)}
+.defile{overflow-x:auto}
+td.num,th.num{text-align:right;white-space:nowrap}
+.pastille{display:inline-block;border-radius:99px;padding:1px 9px;font-size:.78rem;font-weight:600}
+.p-DONNE{background:#DDF3E3;color:#1E6B30}.p-PARTIEL{background:#FDF0DC;color:#8A5300}.p-MANQUE{background:#FDECEA;color:var(--rouge)}
+.p-JUSTIFIE{background:#E7EEFC;color:#1E3A8A}.p-NON_RENSEIGNE{background:var(--fond);color:var(--gris)}.p-A_VENIR{background:var(--fond);color:var(--gris)}
+.note-h{font-size:.82rem;color:var(--gris);margin:0 0 6px}
+.alerte-h{background:#FDF0DC;color:#6B4200;border-radius:8px;padding:8px 12px;margin:0 0 8px;font-size:.88rem}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .alerte-h{background:#3A2A0B;color:#FFD9A0}:root:not([data-theme=light]) .p-DONNE{background:#12301B;color:#9BE3B0}:root:not([data-theme=light]) .p-MANQUE{background:#3A1614;color:#FFB4AB}:root:not([data-theme=light]) .p-JUSTIFIE{background:#17284F;color:#BBD0FF}:root:not([data-theme=light]) .p-PARTIEL{background:#3A2A0B;color:#FFD9A0}}
+</style>
+{% macro tuiles(t) %}
+<div class="chiffres">
+  <div class="chiffre"><b>{{ t.prevu_txt }}</b><span>Heures prévues ({{ t.nb_prevues }} cours)</span></div>
+  <div class="chiffre vert"><b>{{ t.donne_txt }}</b><span>Heures données</span></div>
+  <div class="chiffre rouge"><b>{{ t.manque_txt }}</b><span>Heures manquées</span></div>
+  <div class="chiffre"><b>{{ t.justifie_txt }}</b><span>Manquées, justifiées (permission, congé)</span></div>
+  <div class="chiffre"><b>{{ t.non_renseigne_txt }}</b><span>Non renseignées (pas de pointage)</span></div>
+  <div class="chiffre"><b>{{ t.a_venir_txt }}</b><span>À venir</span></div>
+  <div class="chiffre"><b>{{ (t.taux ~ ' %') if t.taux is not none else '—' }}</b><span>Taux d'exécution</span></div>
+</div>
+{% endmacro %}
+{% set R = hp.d or hp.r %}
+{% if hp.erreur %}<div class="erreur">{{ hp.erreur }}</div>{% endif %}
+
+<form method="get" class="filtre-h" aria-label="Choisir la période">
+  <input type="hidden" name="f" value="heures">
+  {% if hp.matricule %}<input type="hidden" name="prof" value="{{ hp.matricule }}">{% endif %}
+  <div><label for="hp-annee">Année scolaire</label>
+    <select id="hp-annee" name="annee">{% for a in hp.annees %}<option value="{{ a }}" {{ 'selected' if a == hp.annee else '' }}>{{ a }}</option>{% endfor %}</select></div>
+  <div><label for="hp-du">Du</label><input id="hp-du" type="date" name="du" value="{{ hp.du }}" required></div>
+  <div><label for="hp-au">Au</label><input id="hp-au" type="date" name="au" value="{{ hp.au }}" required></div>
+  {% if not hp.matricule %}<div><label for="hp-q">Professeur</label><input id="hp-q" type="search" name="q" value="{{ hp.q }}" placeholder="Nom ou matricule"></div>{% endif %}
+  <div><button type="submit">Afficher</button></div>
+</form>
+<div class="raccourcis">
+  {% for lib, d, f in hp.raccourcis %}<a href="{{ url_for('etudes_sous_menu', sous='direction_etudes', f='heures', annee=hp.annee or none, du=d, au=f, prof=hp.matricule or none) }}">{{ lib }}</a>{% endfor %}
+</div>
+
+{% if R %}
+  {% if R.classes_non_publiees %}<div class="alerte-h">Horaires non publiés, donc non comptés : {{ R.classes_non_publiees|join(', ') }}.</div>{% endif %}
+  {% if R.seances_sans_professeur %}<div class="alerte-h">{{ R.seances_sans_professeur }} cours des horaires publiés n'ont pas de professeur : ils ne sont comptés pour personne.</div>{% endif %}
+  <p class="note-h">Période du {{ R.debut }} au {{ R.fin }} · {{ R.jours_travail }} jour(s) de travail{% if R.a_venir %} · les jours à venir sont comptés « à venir »{% endif %}.
+    Calcul d'après les horaires publiés et le pointage du personnel (Gestion du personnel &gt; Présence et absence).</p>
+
+  {# ------------------------------------------------------------ détail d'un professeur #}
+  {% if hp.d %}
+    {% set p = hp.d.prof %}
+    <p style="margin:0 0 6px"><a class="lien" href="{{ url_for('etudes_sous_menu', sous='direction_etudes', f='heures', annee=hp.annee, du=hp.du, au=hp.au) }}">&larr; Tous les professeurs</a></p>
+    <h3 class="sec" style="margin-top:4px">{{ p.nom }} <span class="sous" style="font-size:.85rem;font-weight:normal">· {{ p.matricule }} · {{ p.hebdo_txt }} par semaine</span></h3>
+    {{ tuiles(p) }}
+    <p style="margin:0 0 10px"><a class="bouton second" href="{{ url_for('etudes_heures_impression', annee=hp.annee, du=hp.du, au=hp.au, prof=p.matricule) }}" target="_blank" rel="noopener">Imprimer</a></p>
+
+    <h3 class="sec">Par cours</h3>
+    <div class="carte defile"><table class="tableau">
+      <thead><tr><th>Classe</th><th>Cours</th><th class="num">Prévues</th><th class="num">Données</th><th class="num">Manquées</th><th class="num">Justifiées</th><th class="num">Non renseignées</th><th class="num">À venir</th><th class="num">Taux</th></tr></thead>
+      <tbody>{% for k in p.cours %}<tr><td>{{ k.classe }}</td><td>{{ k.cours }}</td><td class="num">{{ k.prevu_txt }}</td><td class="num">{{ k.donne_txt }}</td><td class="num">{{ k.manque_txt }}</td><td class="num">{{ k.justifie_txt }}</td><td class="num">{{ k.non_renseigne_txt }}</td><td class="num">{{ k.a_venir_txt }}</td><td class="num">{{ (k.taux ~ ' %') if k.taux is not none else '—' }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+
+    <h3 class="sec">Séance par séance</h3>
+    {% if p.incoherentes %}<div class="alerte-h">{{ p.incoherentes }} séance(s) à vérifier : le professeur est marqué absent ou en permission, mais ses élèves ont été pointés pour ce cours ce jour-là.</div>{% endif %}
+    <p class="note-h">{{ p.confirme }} séance(s) donnée(s) confirmée(s) par la présence des élèves saisie par le professeur.</p>
+    <div class="carte defile"><table class="tableau">
+      <thead><tr><th>Date</th><th>Heure</th><th>Classe</th><th>Cours</th><th>Résultat</th><th class="num">Données</th><th class="num">Manquées</th><th>Remarque</th></tr></thead>
+      <tbody>{% for l in p.lignes %}<tr>
+        <td>{{ l.nom_jour }} {{ l.jour }}</td><td>{{ l.debut }}–{{ l.fin }}</td><td>{{ l.classe }}</td><td>{{ l.cours }}</td>
+        <td><span class="pastille p-{{ l.code }}">{{ l.libelle }}</span></td>
+        <td class="num">{{ l.donne if l.code in ('DONNE','PARTIEL') else '' }}</td><td class="num">{{ l.manque if l.code in ('MANQUE','PARTIEL','JUSTIFIE') else '' }}</td>
+        <td>{{ l.motif }}{% if l.confirme %} <small class="sous">· confirmé</small>{% endif %}{% if l.incoherente %} <b style="color:var(--rouge)">· à vérifier (élèves pointés)</b>{% endif %}</td>
+      </tr>{% else %}<tr><td colspan="8" class="sous">Aucune séance dans cette période.</td></tr>{% endfor %}</tbody>
+    </table></div>
+
+  {# ------------------------------------------------------------ tous les professeurs #}
+  {% else %}
+    {{ tuiles(R.totaux) }}
+    <p style="margin:0 0 10px;display:flex;gap:8px;flex-wrap:wrap">
+      <a class="bouton second" href="{{ url_for('etudes_heures_impression', annee=hp.annee, du=hp.du, au=hp.au, q=hp.q or none) }}" target="_blank" rel="noopener">Imprimer</a>
+      <a class="bouton second" href="{{ url_for('etudes_heures_csv', annee=hp.annee, du=hp.du, au=hp.au, q=hp.q or none) }}">Exporter (CSV)</a>
+    </p>
+    <div class="carte defile">
+    {% if R.profs %}
+      <table class="tableau">
+        <thead><tr><th>Professeur</th><th class="num">Par semaine</th><th class="num">Prévues</th><th class="num">Données</th><th class="num">Manquées</th><th class="num">Justifiées</th><th class="num">Non renseignées</th><th class="num">À venir</th><th class="num">Taux</th><th></th></tr></thead>
+        <tbody>{% for p in R.profs %}<tr>
+          <td><b>{{ p.nom }}</b><br><small class="sous">{{ p.matricule }}</small></td>
+          <td class="num">{{ p.hebdo_txt }}</td><td class="num">{{ p.prevu_txt }}</td><td class="num">{{ p.donne_txt }}</td>
+          <td class="num" {% if p.manque %}style="color:var(--rouge);font-weight:600"{% endif %}>{{ p.manque_txt }}</td>
+          <td class="num">{{ p.justifie_txt }}</td><td class="num">{{ p.non_renseigne_txt }}</td><td class="num">{{ p.a_venir_txt }}</td>
+          <td class="num">{{ (p.taux ~ ' %') if p.taux is not none else '—' }}</td>
+          <td><a class="lien" href="{{ url_for('etudes_sous_menu', sous='direction_etudes', f='heures', annee=hp.annee, du=hp.du, au=hp.au, prof=p.matricule) }}">Détail</a></td>
+        </tr>{% endfor %}</tbody>
+      </table>
+    {% else %}
+      <p class="sous" style="margin:0">Aucun professeur n'a de cours dans un horaire publié pour cette année{% if hp.q %} (ou ne correspond à la recherche){% endif %}. Publiez d'abord les horaires dans « Élaboration horaire ».</p>
+    {% endif %}
+    </div>
+  {% endif %}
+  <p class="note-h" style="margin-top:10px">Légende : <b>Données</b> = le professeur était présent ; <b>Manquées</b> = absent ou en retard, sans autorisation ; <b>Justifiées</b> = permission ou congé accordé ;
+    <b>Non renseignées</b> = jour passé sans pointage (jamais comptées comme absence) ; taux = données / (données + manquées).</p>
+{% endif %}

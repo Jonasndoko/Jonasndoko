@@ -1,0 +1,21 @@
+{% extends "travaux_base.html" %}
+{% block contenu %}
+<p class="sous">La restauration remplace <strong>toute la base actuelle</strong> (élèves, paiements, comptes, droits, journal) par le contenu d'une sauvegarde. Les opérations faites depuis cette sauvegarde sont perdues. Une sauvegarde de sécurité de la base actuelle est créée automatiquement juste avant, et tout le monde est déconnecté après.</p>
+<div class="carte">
+  <h2>1. Choisir une sauvegarde rangée sur le serveur</h2>
+  <div class="defile"><table class="tableau"><tr><th>Date</th><th>Fichier</th><th class="nb">Taille</th><th>Contenu</th><th></th></tr>
+  {% for b in liste %}<tr><td>{{ b.date|horo }}</td><td>{{ b.nom }}</td><td class="nb">{{ b.taille }}</td><td>{{ b.contenu }}</td>
+    <td><a class="bouton second petit" href="{{ url_for('travaux_restauration_examiner', f=b.nom) }}">Examiner</a></td></tr>
+  {% else %}<tr><td colspan="5" class="sous">Aucune sauvegarde sur le serveur.</td></tr>{% endfor %}
+  </table></div>
+</div>
+<div class="carte">
+  <h2>2. Ou envoyer un fichier de sauvegarde (.csfbak)</h2>
+  <p class="sous">Par exemple une sauvegarde faite dans le logiciel Windows ou téléchargée plus tôt (taille maximale : {{ taille_max }} Mo). Le fichier est contrôlé (empreinte, intégrité, structure) avant d'être accepté ; rien n'est remplacé à cette étape.</p>
+  <form method="post" action="{{ url_for('travaux_restauration_importer') }}" enctype="multipart/form-data">
+    <label for="fichier">Fichier de sauvegarde</label>
+    <input id="fichier" type="file" name="fichier" accept=".csfbak" required>
+    <div style="margin-top:12px"><button type="submit">Envoyer et contrôler</button></div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "paiement_base.html" %}
+{% block contenu %}
+<form class="carte form" style="max-width:520px" method="post" action="/m/paiement/inscription/enregistrer"
+      onsubmit="this.querySelector('button[type=submit]').disabled=true">
+  <h1>Confirmer le paiement d'inscription</h1>
+  <p class="sous">Vérifiez avant d'enregistrer : un reçu enregistré ne se modifie pas.</p>
+  <dl class="infos" style="grid-template-columns:1fr">
+    <div><dt>Candidat</dt><dd>{{ identite }}</dd></div>
+    <div><dt>Année</dt><dd>{{ p.annee }}</dd></div>
+    <div><dt>Classe souhaitée</dt><dd>{{ classe_txt }}</dd></div>
+    <div><dt>Frais</dt><dd>{{ choisi[1] }}</dd></div>
+    <div><dt>Montant</dt><dd style="font-size:1.3rem">{{ choisi[2]|montant }} {{ choisi[3] }}</dd></div>
+  </dl>
+  <input type="hidden" name="nom" value="{{ p.nom }}"><input type="hidden" name="postnom" value="{{ p.postnom }}">
+  <input type="hidden" name="prenom" value="{{ p.prenom }}"><input type="hidden" name="annee" value="{{ p.annee }}">
+  <input type="hidden" name="classe" value="{{ p.classe }}"><input type="hidden" name="codtf" value="{{ choisi[0] }}">
+  <div class="actions">
+    <button type="submit">Confirmer et enregistrer</button>
+    <a class="bouton second" href="/m/paiement/inscription">Annuler</a>
+  </div>
+</form>
+{% endblock %}

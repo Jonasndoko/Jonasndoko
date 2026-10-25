@@ -1,0 +1,30 @@
+{% extends "audit_base.html" %}
+{% from "_audit_macros.html" import date, texte, choix, exporter %}
+{% block contenu %}
+<form method="get" class="filtres" action="{{ url_for('audit_journal') }}">
+  <div class="grille-f">
+    {{ date('du', 'Du', v.du) }}{{ date('au', 'Au', v.au) }}
+    {{ choix('u', 'Utilisateur', utilisateurs, v.u, 'Tous les utilisateurs') }}
+    {{ choix('cat', 'Catégorie', categories.items(), v.cat, 'Toutes les catégories') }}
+    {{ texte('texte', 'Texte', v.texte) }}
+  </div>
+  <label class="case-f"><input type="checkbox" name="fin" value="1" {{ 'checked' if v.fin == '1' else '' }}> Opérations financières seulement</label>
+  <div class="actions">
+    <button type="submit">Rechercher</button>
+    <a class="bouton second" href="{{ url_for('audit_journal', du=aujourdhui, au=aujourdhui) }}">Aujourd'hui</a>
+    <a class="bouton second" href="{{ url_for('audit_journal') }}">Réinitialiser</a>
+    <span style="flex:1"></span>{{ exporter('journal', q) }}
+  </div>
+</form>
+{% if r %}
+<div class="resume">{% if r.total %}{{ r.total }} ligne(s) trouvée(s){% else %}Aucune ligne trouvée{% endif %}{% if r.total > r.lignes|length %} — les {{ r.lignes|length }} plus récentes sont affichées : affinez les filtres ou exportez pour tout obtenir{% endif %}</div>
+<div class="carte"><div class="defile"><table class="tableau">
+  <tr><th>Date et heure</th><th>Utilisateur</th><th>Poste</th><th>Catégorie</th><th>Action</th><th>Détail</th></tr>
+  {% for l in r.lignes %}
+  <tr class="{{ 'alerte' if l.action in ('CONNEXION_ECHEC', 'CONNEXION_REFUSEE_BLOCAGE') else ('financier' if l.financier else '') }}">
+    <td style="white-space:nowrap">{{ l.date_txt }}</td><td>{{ l.login or '—' }}{% if l.nom %}<br><span class="petit-texte">{{ l.nom }}</span>{% endif %}</td><td>{{ l.poste or '—' }}</td>
+    <td>{{ l.categorie_txt }}</td><td>{{ l.libelle }}</td><td class="ligne-detail">{{ l.detail }}</td></tr>
+  {% else %}<tr><td colspan="6" class="sous">Aucune ligne.</td></tr>{% endfor %}
+</table></div></div>
+{% endif %}
+{% endblock %}

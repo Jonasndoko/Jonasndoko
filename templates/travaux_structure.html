@@ -1,0 +1,24 @@
+{% extends "travaux_base.html" %}
+{% block contenu %}
+<p class="sous">Compare les tables de la base à celles que le programme attend. Rien n'est jamais supprimé : les tables manquantes sont créées, les colonnes manquantes ajoutées. Une sauvegarde de sécurité est faite avant. Cette mise à jour est aussi faite automatiquement à chaque ouverture du programme.</p>
+<div class="carte">
+  {% if a.bloquants %}<div class="erreur">⚠ {{ a.bloquants[0] }}</div>
+  {% elif a.a_faire %}<div class="alerte">Mise à jour nécessaire (structure n° {{ a.version_actuelle }}, le programme attend le n° {{ a.version_cible }}).</div>
+  {% else %}<div class="succes">✔ Les {{ total }} tables sont à jour (structure n° {{ a.version_actuelle }}).</div>{% endif %}
+  {% if a_faire %}<p><b>À faire :</b> {{ a_faire|join(' · ') }}</p>{% endif %}
+  {% if resultat is not none %}<div class="{{ 'succes' if resultat else 'alerte' }}">{% if resultat %}Mise à jour terminée :<ul>{% for r in resultat %}<li>{{ r }}</li>{% endfor %}</ul>{% else %}Rien à mettre à jour : tout était déjà à jour.{% endif %}</div>{% endif %}
+  {% if integrite is not none %}<div class="{{ 'succes' if integrite|selectattr(1)|list|length == integrite|length else 'erreur' }}">{% for nom, reussi, detail in integrite %}<div>{{ '✔' if reussi else '✘' }} {{ nom }} : {{ detail }}</div>{% endfor %}</div>{% endif %}
+  <div class="actions" style="margin:0 0 14px">
+    <form method="post" action="{{ url_for('travaux_structure_maj') }}" onsubmit="return confirm('Mettre à jour la structure maintenant ? Une sauvegarde de sécurité sera créée avant.')"><button type="submit" {{ 'disabled' if not a.a_faire or a.bloquants else '' }}>Mettre à jour la structure</button></form>
+    <a class="bouton second" href="{{ url_for('travaux_structure') }}">Analyser à nouveau</a>
+    <form method="post" action="{{ url_for('travaux_structure_integrite') }}"><button class="second" type="submit">Vérifier l'intégrité des données</button></form>
+  </div>
+  <div class="defile"><table class="tableau">
+    <tr><th>Table</th><th>État</th><th class="nb">Lignes</th><th>Détail</th></tr>
+    {% for t in a.tables %}<tr><td>{{ t.nom }}</td>
+      <td><span class="badge {{ 'encours' if t.statut == 'OK' else 'inactif' if t.statut == 'INCONNUE' else 'partiel' }}">{{ t.libelle_statut }}</span></td>
+      <td class="nb">{{ '' if t.statut == 'MANQUANTE' else t.nb_lignes }}</td>
+      <td>{% if t.manquantes %}Colonnes à ajouter : {{ t.manquantes|join(', ') }}{% elif t.en_trop %}Colonnes supplémentaires conservées : {{ t.en_trop|join(', ') }}{% endif %}</td></tr>{% endfor %}
+  </table></div>
+</div>
+{% endblock %}

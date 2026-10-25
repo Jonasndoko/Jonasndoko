@@ -1,0 +1,13 @@
+{% extends "travaux_base.html" %}
+{% block contenu %}
+<p class="sous">Crée une copie complète et cohérente de la base (élèves, paiements, comptes, journal), même pendant que l'application est utilisée. Le fichier obtenu (.csfbak) permet de tout retrouver en cas de panne ou de perte.</p>
+<div class="alerte">⚠ Une sauvegarde rangée sur le serveur ne protège pas contre sa panne ou sa perte : téléchargez-la régulièrement et gardez-la ailleurs (clé USB, autre ordinateur). Le fichier contient des données d'élèves et de comptes et n'est pas chiffré : conservez-le en lieu sûr. Pour remettre une sauvegarde en place, utilisez l'onglet « Restauration ».</div>
+<div class="carte">
+  <form method="post" action="{{ url_for('travaux_sauvegarde_creer') }}" style="margin-bottom:14px"><button type="submit">Sauvegarder maintenant</button></form>
+  <div class="defile"><table class="tableau"><tr><th>Date</th><th>Fichier</th><th class="nb">Taille</th><th>Contenu</th><th></th></tr>
+  {% for b in liste %}<tr><td>{{ b.date|horo }}</td><td>{{ b.nom }}</td><td class="nb">{{ b.taille }}</td><td>{{ b.contenu }}</td>
+    <td><a class="bouton second petit" href="{{ url_for('travaux_sauvegarde_telecharger', f=b.nom) }}">Télécharger</a></td></tr>
+  {% else %}<tr><td colspan="5" class="sous">Aucune sauvegarde pour l'instant.</td></tr>{% endfor %}
+  </table></div>
+</div>
+{% endblock %}

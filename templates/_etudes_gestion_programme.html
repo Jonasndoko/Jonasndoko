@@ -1,0 +1,43 @@
+<p class="sous">Choisissez l'année et la classe, ouvrez les cours qui s'y donnent, puis attribuez-les à leurs professeurs. Au primaire, le titulaire est l'unique enseignant de la classe : ses cours lui sont attribués automatiquement.</p>
+<div class="carte">
+  <form method="get" action="{{ url_for('etudes_sous_menu', sous='direction_etudes') }}" class="ligne"><input type="hidden" name="f" value="programme">
+    <select name="a" aria-label="Année" style="width:auto">{% for x in annees %}<option {{ 'selected' if x.annee == a else '' }}>{{ x.annee }}</option>{% endfor %}</select>
+    <select name="c" aria-label="Classe"><option value="">— choisir une classe —</option>{% for k in classes %}<option value="{{ k.n_classe }}" {{ 'selected' if k.n_classe == c else '' }}>{{ k.designation }}  ({{ k.niveau }}{{ ' - ' ~ k.option if k.option else '' }})</option>{% endfor %}</select>
+    <button class="second" type="submit">Afficher</button>
+  </form>
+</div>
+{% if prog %}
+<form id="lot" method="post" action="{{ url_for('gestion_programme_attribuer') }}"><input type="hidden" name="a" value="{{ a }}"><input type="hidden" name="c" value="{{ c }}"></form>
+<div class="carte espace">
+  <h2 style="margin:0 0 10px;font-size:1.1rem">Cours ouverts : {{ prog.classe.designation }} ({{ a }})</h2>
+  <div class="defile"><table class="tableau">
+    <tr><th></th><th>Cours</th><th class="nb">Heures/sem.</th><th>Professeur</th><th></th></tr>
+    {% for l in prog.cours %}<tr class="{{ 'inactif' if not l.cours_actif else '' }}">
+      <td><input type="checkbox" form="lot" name="ids" value="{{ l.id }}" aria-label="Choisir {{ l.cours }}" style="width:auto"></td>
+      <td>{{ l.cours }}{% if not l.cours_actif %} <span class="badge inactif">désactivé</span>{% endif %}</td><td class="nb">{{ l.heures }}</td>
+      <td>{% if l.professeur %}{{ l.professeur }}{% else %}<span class="sous">— sans professeur —</span>{% endif %}</td>
+      <td>{% if d.modif %}<form method="post" action="{{ url_for('gestion_programme_heures') }}" class="ligne"><input type="hidden" name="id" value="{{ l.id }}"><input type="hidden" name="a" value="{{ a }}"><input type="hidden" name="c" value="{{ c }}">
+        <input name="heures" value="{{ l.heures }}" inputmode="numeric" maxlength="2" aria-label="Heures par semaine" style="width:64px"><button class="second petit" type="submit">Heures</button></form>{% endif %}</td></tr>
+    {% else %}<tr><td colspan="5" class="sous">Aucun cours ouvert dans cette classe pour {{ a }}.</td></tr>{% endfor %}
+  </table></div>
+  {% if prog.cours %}
+  <div class="ligne-actions" style="margin-top:12px">
+    <span class="sous">Pour les cours cochés :</span>
+    {% if d.ajout or d.modif %}<select name="matricule" form="lot" aria-label="Professeur" style="width:auto;max-width:260px"><option value="">— professeur —</option>{% for p in profs %}<option value="{{ p.matricule }}">{{ p.nom_complet }}{{ ' (' ~ p.fonction ~ ')' if p.fonction else '' }} · {{ p.heures }} h</option>{% endfor %}</select>
+    <button type="submit" form="lot">Attribuer le professeur</button>{% endif %}
+    {% if d.modif %}<button class="second" type="submit" form="lot" formaction="{{ url_for('gestion_programme_retirer_prof') }}">Retirer le professeur</button>{% endif %}
+    {% if d.suppr %}<button class="danger" type="submit" form="lot" formaction="{{ url_for('gestion_programme_retirer_cours') }}" onclick="return confirm('Retirer les cours cochés de cette classe ?')">Retirer de la classe</button>{% endif %}
+  </div>{% endif %}
+</div>
+{% if d.ajout %}
+<div class="carte espace">
+  <h2 style="margin:0 0 6px;font-size:1.1rem">Cours applicables, pas encore ouverts</h2>
+  <p class="sous" style="margin:0 0 10px">Un cours s'applique à la classe si son niveau, son option et son année d'étude correspondent.</p>
+  {% if prog.a_ouvrir %}
+  <form method="post" action="{{ url_for('gestion_programme_ouvrir') }}"><input type="hidden" name="a" value="{{ a }}"><input type="hidden" name="c" value="{{ c }}">
+    <div class="liste-cases" style="max-height:260px;overflow:auto;border:1px solid var(--bord);border-radius:8px;padding:6px 10px">{% for x in prog.a_ouvrir %}<label class="case-ligne" style="margin:4px 0"><input type="checkbox" name="ids" value="{{ x.id_cours }}"> {{ x.libelle }} <span class="sous">({{ x.heures }} h/sem.)</span></label>{% endfor %}</div>
+    <div class="actions"><button type="submit">Ouvrir les cours cochés</button><button class="second" type="submit" name="tous" value="1">Ouvrir tous les cours applicables</button></div>
+  </form>
+  {% else %}<p class="sous">Tous les cours applicables sont déjà ouverts (ou aucun cours ne s'applique : voir l'onglet « Cours »).</p>{% endif %}
+</div>{% endif %}
+{% endif %}

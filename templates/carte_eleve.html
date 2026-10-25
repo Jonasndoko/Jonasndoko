@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block titre %}Carte · {{ f.nom_complet }}{% endblock %}
+{% block entete %}
+{% if menu_utile %}<a class="bouton clair" href="/">Menu</a>{% endif %}
+<span style="font-size:.85rem">{{ s.nom_complet }} · {{ s.libelle_role }}</span>
+<form method="post" action="/deconnexion"><button class="clair" type="submit">Déconnexion</button></form>
+{% endblock %}
+{% block corps %}
+<style>
+.photo{width:150px;aspect-ratio:3/4;border:1px solid var(--bord);border-radius:6px;background:var(--fond);display:flex;align-items:center;justify-content:center;color:var(--gris);font-size:.85rem;text-align:center;overflow:hidden}
+.photo img{width:100%;height:100%;object-fit:cover;display:block}
+.qr{width:150px;height:150px;border:1px solid var(--bord);border-radius:6px;overflow:hidden;background:#fff}
+.qr svg{width:100%;height:100%;display:block}
+.visees{display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start}
+.vue{position:relative;width:100%;max-width:520px;background:#101820;border-radius:8px;overflow:hidden;margin:10px 0}
+.vue video,.vue canvas{width:100%;display:block}
+.vue .cadre{position:absolute;border:2px solid #fff;box-shadow:0 0 0 999px rgba(0,0,0,.35);pointer-events:none}
+.vue canvas{max-width:300px;margin:0 auto}
+[hidden]{display:none!important}
+</style>
+<div class="ligne" style="justify-content:space-between;margin-bottom:14px">
+  <div><h1 style="margin:0">{{ f.nom_complet }}</h1><span class="sous" style="margin:0">Matricule {{ f.matricule }}</span></div>
+  <a class="bouton second" href="/m/carte">Autre élève</a>
+</div>
+{% if message_ok %}<div class="succes" role="status">{{ message_ok }}</div>{% endif %}
+{% if erreur is defined and erreur %}<div class="erreur" role="alert">{{ erreur }}</div>{% endif %}
+{% if not f.actif %}<div class="alerte" role="alert">Cet élève est désactivé : sa carte ne peut pas être imprimée.</div>{% endif %}
+{% if manquants %}<div class="alerte" role="status">Information manquante : {{ manquants|join(", ") }}. L'Administrateur la complète dans Travaux techniques &gt; Élèves.</div>{% endif %}
+
+<div class="cols">
+  <div class="carte">
+    <h2 style="margin:0 0 10px;font-size:1.05rem">Informations de l'élève</h2>
+    <dl class="infos" style="grid-template-columns:1fr 1fr">
+      <div><dt>Sexe</dt><dd>{{ f.sexe_txt or "—" }}</dd></div>
+      <div><dt>Né(e) le</dt><dd>{{ f.naissance or "—" }}</dd></div>
+      <div><dt>Lieu de naissance</dt><dd>{{ f.lieu_naissance or "—" }}</dd></div>
+      <div><dt>Nationalité</dt><dd>{{ f.nationalite or "—" }}</dd></div>
+      <div><dt>Adresse</dt><dd>{{ f.adresse or "—" }}</dd></div>
+      <div><dt>Classe</dt><dd>{{ f.classe or "Non inscrit pour l'année en cours" }}</dd></div>
+      <div><dt>Option</dt><dd>{{ f.option or "—" }}</dd></div>
+      <div><dt>Année scolaire</dt><dd>{{ f.annee or "—" }}</dd></div>
+      <div><dt>Tuteur</dt><dd>{{ f.tuteur or "—" }}{% if f.tel_tuteur %} ({{ f.tel_tuteur }}){% endif %}</dd></div>
+    </dl>
+  </div>
+
+  <div class="carte">
+    <h2 style="margin:0 0 10px;font-size:1.05rem">Photo et code QR</h2>
+    <div class="visees">
+      <div class="photo" id="apercu">{% if f.a_photo %}<img src="{{ url_for('carte_photo', matricule=f.matricule) }}" alt="Photo de {{ f.nom_complet }}">{% else %}Aucune photo{% endif %}</div>
+      <div class="qr">{{ svg_qr|safe }}</div>
+    </div>
+
+    {% if peut_photo or peut_retirer %}
+    <div class="actions">
+      {% if peut_photo %}
+      <button type="button" id="b-camera">Prendre la photo</button>
+      <label class="bouton second" style="margin:0;font-size:1rem;color:var(--bleu)">Importer…
+        <input type="file" id="fichier" accept="image/jpeg,image/png" hidden></label>
+      {% endif %}
+      {% if peut_retirer %}
+      <form method="post" action="{{ url_for('carte_photo_retirer', matricule=f.matricule) }}" style="margin:0"
+            onsubmit="return confirm('Retirer la photo de cet élève ?')"><button type="submit" class="second">Retirer</button></form>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <div id="zone-camera" hidden>
+      <div class="ligne"><label for="liste-cam" style="margin:0">Caméra :</label><select id="liste-cam" hidden></select></div>
+      <div class="vue" id="vue"><video id="video" autoplay playsinline muted></video><div class="cadre" id="cadre"></div></div>
+      <canvas id="photo" width="300" height="400" hidden style="max-width:300px;width:100%;border-radius:8px;margin:10px 0"></canvas>
+      <div class="actions" style="margin-top:0">
+        <button type="button" id="b-capturer">Capturer</button>
+        <button type="button" id="b-reprendre" class="second" hidden>Reprendre</button>
+        <button type="button" id="b-utiliser" hidden>Utiliser cette photo</button>
+        <button type="button" id="b-annuler" class="second">Annuler</button>
+      </div>
+    </div>
+    <div id="msg" role="status" class="espace" style="font-size:.9rem" hidden></div>
+
+    <form method="get" action="{{ url_for('carte_pdf_route', matricule=f.matricule) }}" target="_blank" class="espace">
+      <label style="display:flex;gap:8px;align-items:flex-start;color:var(--texte);margin:0 0 10px">
+        <input type="radio" name="format" value="a4" checked style="width:auto;margin-top:5px"> <span>Feuille A4 (recto + verso côte à côte)</span></label>
+      <label style="display:flex;gap:8px;align-items:flex-start;color:var(--texte);margin:0 0 12px">
+        <input type="radio" name="format" value="carte" style="width:auto;margin-top:5px"> <span>2 pages au format de la carte (imprimante de cartes)</span></label>
+      {% if not f.a_photo %}<div class="alerte">Pas encore de photo : la carte sera imprimée avec un cadre vide.</div>{% endif %}
+      <button type="submit" {{ '' if f.actif else 'disabled' }}>IMPRIMER LA CARTE</button>
+    </form>
+  </div>
+</div>
+
+{% if peut_photo %}
+<script>
+(function(){
+  var L=300,H=400,URL_ENVOI={{ url_for('carte_photo_envoyer', matricule=f.matricule)|tojson }};
+  var $=function(i){return document.getElementById(i)};
+  var zone=$('zone-camera'),video=$('video'),cadre=$('cadre'),toile=$('photo'),msg=$('msg'),liste=$('liste-cam');
+  var flux=null,blob=null;
+  function dire(t,ok){msg.hidden=!t;msg.textContent=t||'';msg.style.color=ok?'var(--vert)':'var(--rouge)'}
+  function zonePortrait(w,h){return w*4>=h*3?{w:Math.floor(h*3/4),h:h}:{w:w,h:Math.floor(w*4/3)}}
+  function arreter(){if(flux){flux.getTracks().forEach(function(t){t.stop()});flux=null}video.srcObject=null}
+  function etat(figee){
+    video.parentNode.hidden=figee;toile.hidden=!figee;
+    $('b-capturer').hidden=figee;$('b-reprendre').hidden=!figee;$('b-utiliser').hidden=!figee;
+  }
+  function ouvrir(id){
+    arreter();
+    var video_c=id?{deviceId:{exact:id}}:{facingMode:'user',width:{ideal:1280},height:{ideal:960}};
+    return navigator.mediaDevices.getUserMedia({video:video_c,audio:false}).then(function(f){
+      flux=f;video.srcObject=f;
+      return navigator.mediaDevices.enumerateDevices();
+    }).then(function(ds){
+      var cams=ds.filter(function(d){return d.kind==='videoinput'});
+      if(cams.length>1){
+        var cur=flux&&flux.getVideoTracks()[0].getSettings().deviceId;
+        liste.innerHTML='';
+        cams.forEach(function(c,i){var o=document.createElement('option');o.value=c.deviceId;o.textContent=c.label||('Caméra '+(i+1));if(c.deviceId===cur)o.selected=true;liste.appendChild(o)});
+        liste.hidden=false;
+      }
+      dire('Placez le visage dans le cadre blanc, puis cliquez sur « Capturer ».',true);
+    });
+  }
+  video.addEventListener('loadedmetadata',function(){
+    var z=zonePortrait(video.videoWidth,video.videoHeight);
+    cadre.style.width=(z.w/video.videoWidth*100)+'%';cadre.style.height=(z.h/video.videoHeight*100)+'%';
+    cadre.style.left=((1-z.w/video.videoWidth)/2*100)+'%';cadre.style.top=((1-z.h/video.videoHeight)/2*100)+'%';
+  });
+  function ecrire(source,w,h){   // source : video ou image ; recadrage 3:4 centré -> 300 x 400
+    var z=zonePortrait(w,h),ctx=toile.getContext('2d');
+    ctx.drawImage(source,(w-z.w)/2,(h-z.h)/2,z.w,z.h,0,0,L,H);
+    return new Promise(function(ok){toile.toBlob(function(b){blob=b;ok(b)},'image/jpeg',0.88)});
+  }
+  $('b-camera').onclick=function(){
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+      dire("La caméra n'est pas disponible dans ce navigateur, ou la page n'est pas en HTTPS. Utilisez « Importer… ».");return}
+    zone.hidden=false;etat(false);dire('Ouverture de la caméra…',true);
+    ouvrir().catch(function(e){
+      zone.hidden=true;
+      dire(e&&e.name==='NotAllowedError'?"Accès à la caméra refusé : autorisez-la dans le navigateur (icône à gauche de l'adresse), ou utilisez « Importer… ».":
+           "Aucune caméra utilisable (branchée, et non utilisée par un autre programme ?). Vous pouvez utiliser « Importer… ».");
+    });
+  };
+  liste.onchange=function(){ouvrir(liste.value).catch(function(){dire("Impossible d'ouvrir cette caméra.")})};
+  $('b-capturer').onclick=function(){
+    if(!video.videoWidth)return;
+    ecrire(video,video.videoWidth,video.videoHeight).then(function(){
+      etat(true);dire('Photo capturée. « Utiliser cette photo » pour l’enregistrer, ou « Reprendre ».',true)});
+  };
+  $('b-reprendre').onclick=function(){blob=null;etat(false);dire('Placez le visage dans le cadre blanc, puis cliquez sur « Capturer ».',true)};
+  $('b-annuler').onclick=function(){arreter();zone.hidden=true;blob=null;dire('')};
+  function envoyer(){
+    if(!blob)return;
+    var fd=new FormData();fd.append('photo',blob,'photo.jpg');dire('Envoi de la photo…',true);
+    fetch(URL_ENVOI,{method:'POST',body:fd,credentials:'same-origin'}).then(function(r){
+      return r.json().catch(function(){return{erreur:r.status===413?'La photo est trop lourde.':"Réponse inattendue du serveur."}}).then(function(d){return{r:r,d:d}})
+    }).then(function(x){
+      if(x.d&&x.d.ok){arreter();location.href=x.d.suite}else dire((x.d&&x.d.erreur)||'Échec de l’enregistrement.');
+    }).catch(function(){dire("Connexion impossible : la photo n'a pas été enregistrée.")});
+  }
+  $('b-utiliser').onclick=envoyer;
+  $('fichier').onchange=function(){
+    var f=this.files[0];this.value='';if(!f)return;
+    var lire=window.createImageBitmap?createImageBitmap(f,{imageOrientation:'from-image'}):new Promise(function(ok,ko){var i=new Image();i.onload=function(){ok(i)};i.onerror=ko;i.src=URL.createObjectURL(f)});
+    lire.then(function(img){
+      var w=img.width||img.naturalWidth,h=img.height||img.naturalHeight;
+      return ecrire(img,w,h);
+    }).then(envoyer).catch(function(){dire("Ce fichier n'est pas une image lisible (JPEG ou PNG).")});
+  };
+})();
+</script>
+{% endif %}
+{% endblock %}

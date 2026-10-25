@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block titre %}{{ titre }}{% endblock %}
+{% block entete %}
+{% if menu_utile %}<a class="bouton clair" href="/">Menu</a>{% endif %}
+<span style="font-size:.85rem">{{ s.nom_complet }}</span>
+<form method="post" action="/deconnexion"><button class="clair" type="submit">Déconnexion</button></form>
+{% endblock %}
+{% block corps %}
+<h1>{{ titre }}</h1>
+{% if en_ligne %}
+<div class="carte">Module disponible.</div>
+{% else %}
+<div class="carte"><b>Ce module est en cours de migration vers le web.</b>
+<p class="sous" style="margin:8px 0 0">Il reste utilisable dans le logiciel Windows en attendant. Votre accès (droits, sections) est déjà reconnu ici.</p></div>
+{% endif %}
+{% endblock %}

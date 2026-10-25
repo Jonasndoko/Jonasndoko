@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block titre %}Carte{% endblock %}
+{% block entete %}
+{% if menu_utile %}<a class="bouton clair" href="/">Menu</a>{% endif %}
+<span style="font-size:.85rem">{{ s.nom_complet }} · {{ s.libelle_role }}</span>
+<form method="post" action="/deconnexion"><button class="clair" type="submit">Déconnexion</button></form>
+{% endblock %}
+{% block corps %}
+<h1>Carte d'élève</h1>
+<p class="sous">Cherchez l'élève, prenez sa photo avec la caméra, puis imprimez sa carte.</p>
+<form class="carte" method="get" action="/m/carte">
+  <label for="q">Nom ou matricule de l'élève</label>
+  <div class="ligne">
+    <input id="q" name="q" value="{{ q }}" autofocus autocomplete="off">
+    <button type="submit">Rechercher</button>
+  </div>
+  {% if message %}<div class="alerte espace" role="alert">{{ message }}</div>{% endif %}
+</form>
+{% if resultats %}
+<div class="carte espace">
+  <p class="sous" style="margin-bottom:8px">{{ resultats|length }} élèves trouvés : choisissez le bon élève.{% if resultats|length >= 60 %} Affinez la recherche si besoin.{% endif %}</p>
+  <div class="defile"><table class="tableau">
+    <tr><th>Matricule</th><th>Nom complet</th><th>Classe (année en cours)</th></tr>
+    {% for r in resultats %}
+    <tr><td><a class="lien" href="{{ url_for('carte_eleve', matricule=r.matricule) }}">{{ r.matricule }}</a></td><td>{{ r.nom_complet }}</td><td>{{ r.classe }}</td></tr>
+    {% endfor %}
+  </table></div>
+</div>
+{% endif %}
+{% endblock %}

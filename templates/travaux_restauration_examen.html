@@ -1,0 +1,27 @@
+{% extends "travaux_base.html" %}
+{% block contenu %}
+<div class="carte">
+  <h2>Sauvegarde : {{ nom }}</h2>
+  {% if probleme %}
+    <div class="erreur" role="alert">✘ {{ probleme }}</div>
+    <p><a class="bouton second" href="{{ url_for('travaux_restauration') }}">Retour</a></p>
+  {% else %}
+    <p>✔ Fichier contrôlé : <strong>{{ examen.eleves }}</strong> élève(s), <strong>{{ examen.paiements }}</strong> paiement(s) valide(s), <strong>{{ examen.utilisateurs }}</strong> compte(s).</p>
+    {% if examen.date_aff %}<p class="sous">Sauvegarde faite le {{ examen.date_aff }} (programme version {{ examen.version_programme }}).</p>{% endif %}
+    {% if not examen.controle %}<div class="alerte">⚠ Fichier de base de données brut, sans empreinte de contrôle.</div>{% endif %}
+    {% if not examen.administrateurs %}<div class="alerte">⚠ Cette sauvegarde ne contient aucun compte Administrateur actif : après la restauration, un nouveau compte Administrateur devra être créé.</div>{% endif %}
+    <div class="alerte">⚠ Toutes les données actuelles seront REMPLACÉES et tous les utilisateurs seront déconnectés. Cette action ne s'annule pas autrement qu'en restaurant la sauvegarde de sécurité créée juste avant.</div>
+    <form method="post" action="{{ url_for('travaux_restauration_restaurer') }}">
+      <input type="hidden" name="f" value="{{ nom }}">
+      <label for="confirmation">Pour confirmer, tapez <strong>{{ mot }}</strong></label>
+      <input id="confirmation" name="confirmation" autocomplete="off" required>
+      <label for="mdp">Votre mot de passe</label>
+      <input id="mdp" type="password" name="mdp" autocomplete="current-password" required>
+      <div style="margin-top:12px;display:flex;gap:10px">
+        <button class="danger" type="submit">Restaurer cette sauvegarde</button>
+        <a class="bouton second" href="{{ url_for('travaux_restauration') }}">Annuler</a>
+      </div>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}

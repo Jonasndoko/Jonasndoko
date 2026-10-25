@@ -1,0 +1,42 @@
+<p class="sous">Consultation seule : la présence est pointée par les professeurs, cours par cours. Un élève n'est présent pour la journée que s'il a assisté à tous les cours pointés ce jour-là ; absent à un seul, il est absent pour la journée.</p>
+<div class="carte">
+  <form method="get" action="{{ url_for(pres_ep, **pres_url) }}" class="ligne">{% for k, v in pres_champs.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+    <select name="a" aria-label="Année" style="width:auto">{% for x in annees %}<option {{ 'selected' if x.annee == a else '' }}>{{ x.annee }}</option>{% endfor %}</select>
+    <a class="bouton second petit" href="{{ url_for(pres_ep, a=a, j=veille, **pres_url) }}" aria-label="Jour précédent">◄</a>
+    <input type="date" name="j" value="{{ j }}" max="{{ aujourdhui }}" aria-label="Jour" style="width:auto">
+    {% if lendemain %}<a class="bouton second petit" href="{{ url_for(pres_ep, a=a, j=lendemain, **pres_url) }}" aria-label="Jour suivant">►</a>{% endif %}
+    <a class="bouton second petit" href="{{ url_for(pres_ep, a=a, **pres_url) }}">Aujourd'hui</a>
+    <button class="second" type="submit">Afficher</button>
+  </form>
+  {% if jour_r %}<p style="margin:10px 0 0;font-weight:700">{{ jour_r.date }} · {{ jour_r.totaux.effectif }} élèves : {{ jour_r.totaux.presents }} présents, {{ jour_r.totaux.absents }} absents, {{ jour_r.totaux.non_renseignes }} non renseignés.</p>{% endif %}
+</div>
+{% if jour_r %}
+<div class="carte espace"><h2 style="margin:0 0 10px;font-size:1.1rem">Classes</h2>
+  <div class="defile"><table class="tableau"><tr><th>Classe</th><th class="nb">Élèves</th><th class="nb">Présents</th><th class="nb">Absents</th><th class="nb">Non renseignés</th><th class="nb">Cours pointés</th><th></th></tr>
+  {% for k in jour_r.classes %}<tr><td>{{ k.classe }}</td><td class="nb">{{ k.effectif }}</td><td class="nb">{{ k.presents }}</td><td class="nb">{{ k.absents }}</td><td class="nb">{{ k.non_renseignes }}</td><td class="nb">{{ k.cours_pointes }}</td>
+    <td><a class="bouton {{ '' if k.n_classe == c else 'second' }} petit" href="{{ url_for(pres_ep, a=a, j=j, c=k.n_classe, **pres_url) }}">{{ 'Affichée' if k.n_classe == c else 'Élèves' }}</a></td></tr>
+  {% else %}<tr><td colspan="7" class="sous">Aucune classe avec des élèves inscrits.</td></tr>{% endfor %}</table></div>
+</div>
+{% endif %}
+{% if classe_r or recap %}
+<div class="carte espace">
+  <h2 style="margin:0 0 10px;font-size:1.1rem">{{ (classe_r or recap).classe }}</h2>
+  <form method="get" action="{{ url_for(pres_ep, **pres_url) }}" class="ligne" style="margin-bottom:12px">{% for k, v in pres_champs.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+    <input type="hidden" name="a" value="{{ a }}"><input type="hidden" name="j" value="{{ j }}"><input type="hidden" name="c" value="{{ c }}">
+    <span class="sous">Récapitulatif du</span><input type="date" name="d1" value="{{ d1 }}" aria-label="Début" style="width:auto"><span class="sous">au</span><input type="date" name="d2" value="{{ d2 }}" aria-label="Fin" style="width:auto">
+    <button class="second" type="submit" name="mode" value="recap">Afficher le récapitulatif</button>
+    {% if recap %}<a class="bouton second" href="{{ url_for(pres_ep, a=a, j=j, c=c, **pres_url) }}">Retour au jour</a>{% endif %}
+  </form>
+  {% if classe_r %}
+  <div class="defile"><table class="tableau"><tr><th>Élève</th><th>Journée</th><th>Détail (cours)</th></tr>
+  {% for e in classe_r.eleves %}<tr><td>{{ e.nom_complet }}</td>
+    <td>{% if e.journee == 'P' %}<span class="badge present">Présent</span>{% elif e.journee == 'A' %}<span class="badge absent">Absent</span>{% else %}<span class="badge nonrenseigne">Non renseigné</span>{% endif %}</td>
+    <td>{% if e.journee == 'A' and e.manques %}Absent à : {{ e.manques|join(', ') }}{% elif e.cours %}{% for x in e.cours %}{{ x.cours }} ({{ 'présent' if x.statut == 'P' else 'absent' }}){{ ', ' if not loop.last }}{% endfor %}{% endif %}</td></tr>
+  {% endfor %}</table></div>
+  {% else %}
+  <p class="sous">Du {{ recap.debut }} au {{ recap.fin }} : {{ recap.jours_pointes }} jour(s) pointé(s).</p>
+  <div class="defile"><table class="tableau"><tr><th>Élève</th><th class="nb">Jours présents</th><th class="nb">Jours absents</th><th class="nb">Présence</th></tr>
+  {% for e in recap.eleves %}<tr><td>{{ e.nom_complet }}</td><td class="nb">{{ e.jours_presents }}</td><td class="nb">{{ e.jours_absents }}</td><td class="nb">{{ (e.taux|string|replace('.', ',') ~ ' %') if e.taux is not none else '—' }}</td></tr>{% endfor %}</table></div>
+  {% endif %}
+</div>
+{% endif %}

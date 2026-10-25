@@ -1,0 +1,668 @@
+<style>
+.chiffres{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:0 0 14px}
+.chiffre{background:var(--carte);border:1px solid var(--bord);border-radius:10px;padding:12px 14px}
+.chiffre b{display:block;font-size:1.5rem;line-height:1.2}.chiffre span{font-size:.78rem;color:var(--gris)}
+.chiffre.vert b{color:var(--vert)}.chiffre.rouge b{color:var(--rouge)}
+.alerte.haute{background:#FDECEA;color:var(--rouge)}
+.alerte.info{background:#E7EEFC;color:#1E3A8A}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .alerte.haute{background:#3A1614;color:#FFB4AB}:root:not([data-theme=light]) .alerte.info{background:#17284F;color:#BBD0FF}}
+.liste-alertes{list-style:none;margin:0;padding:0}.liste-alertes li{margin:0 0 6px}
+h3.sec{margin:20px 0 8px;font-size:1.05rem}
+</style>
+{% include "_etudes_boutons.html" %}
+{% if erreur %}<div class="erreur">{{ erreur }}</div>{% endif %}
+
+{# ------------------------------------------------------------------ 1. tableau de bord #}
+{% if fonction == 'tableau' and tb %}
+<form method="get" class="ligne" style="margin:0 0 14px">
+  <input type="hidden" name="f" value="tableau">
+  <label for="annee" style="margin:0">Année scolaire</label>
+  <select id="annee" name="annee" onchange="this.form.submit()" style="max-width:180px">
+    {% for a in tb.annees %}<option value="{{ a }}" {{ 'selected' if a == tb.annee else '' }}>{{ a }}</option>{% endfor %}
+  </select>
+  <noscript><button type="submit">Afficher</button></noscript>
+</form>
+{% if not tb.annee %}
+<div class="carte"><p class="sous" style="margin:0">Aucune année scolaire n'est encore enregistrée.</p></div>
+{% else %}
+<div class="chiffres">
+  <div class="chiffre"><b>{{ tb.effectif.eleves }}</b><span>Élèves ({{ tb.effectif.filles }} filles, {{ tb.effectif.garcons }} garçons)</span></div>
+  <div class="chiffre"><b>{{ tb.effectif.classes }}</b><span>Classes</span></div>
+  {% if tb.annee_en_cours %}
+  <div class="chiffre vert"><b>{{ tb.jour.presents }}</b><span>Présents aujourd'hui</span></div>
+  <div class="chiffre rouge"><b>{{ tb.jour.absents }}</b><span>Absents aujourd'hui</span></div>
+  <div class="chiffre"><b>{{ tb.jour.non_renseignes }}</b><span>Présence non pointée</span></div>
+  {% endif %}
+  <div class="chiffre"><b>{{ tb.en_attente.candidatures }}</b><span>Candidatures en attente</span></div>
+</div>
+
+<h3 class="sec">Alertes</h3>
+{% if tb.alertes %}
+<ul class="liste-alertes">{% for a in tb.alertes %}<li class="alerte {{ 'haute' if a.gravite == 'haute' else ('info' if a.gravite == 'info' else '') }}">{{ a.texte }}</li>{% endfor %}</ul>
+{% else %}<div class="succes">Aucune alerte pour cette année.</div>{% endif %}
+
+<h3 class="sec">Dossiers en attente</h3>
+<div class="carte">
+  {% if tb.en_attente.candidatures %}
+  <dl class="infos">
+    <div><dt>Candidatures en attente</dt><dd>{{ tb.en_attente.candidatures }}</dd></div>
+    <div><dt>Test d'admission à enregistrer</dt><dd>{{ tb.en_attente.sans_test }}</dd></div>
+    <div><dt>Dossiers validés à affecter</dt><dd>{{ tb.en_attente.a_affecter }}</dd></div>
+  </dl>
+  {% else %}<p class="sous" style="margin:0">Aucune candidature en attente.</p>{% endif %}
+  {% if tb.resultats.reussis or tb.resultats.echecs or tb.resultats.en_attente %}
+  <dl class="infos espace">
+    <div><dt>Élèves ayant réussi l'année</dt><dd>{{ tb.resultats.reussis }}</dd></div>
+    <div><dt>Élèves en échec</dt><dd>{{ tb.resultats.echecs }}</dd></div>
+    <div><dt>Décisions en attente</dt><dd>{{ tb.resultats.en_attente }}</dd></div>
+  </dl>
+  {% endif %}
+</div>
+
+{% if tb.absences_repetees %}
+<h3 class="sec">Absences répétées ({{ cfg.SEUIL_ABSENCES_REPETEES }} jours ou plus sur 30 jours)</h3>
+<div class="carte defile"><table class="tableau">
+  <thead><tr><th>Élève</th><th>Classe</th><th class="nb">Jours d'absence</th><th></th></tr></thead>
+  <tbody>{% for e in tb.absences_repetees[:10] %}
+    <tr><td>{{ e.nom_complet }}</td><td>{{ e.classe }}</td><td class="nb">{{ e.jours }}</td>
+        <td><a class="lien" href="{{ url_for('etudes_sous_menu', sous='prefecture', f='suivi', annee=tb.annee, eleve=e.matricule) }}">Ouvrir le suivi</a></td></tr>
+  {% endfor %}</tbody></table></div>
+{% endif %}
+
+<h3 class="sec">Situation par classe</h3>
+<div class="carte defile">
+{% if tb.classes %}
+<table class="tableau">
+  <thead><tr><th>Classe</th><th>Titulaire</th><th class="nb">Élèves</th>{% if tb.annee_en_cours %}<th class="nb">Présents</th><th class="nb">Absents</th>{% endif %}<th class="nb">Réussite</th></tr></thead>
+  <tbody>{% for k in tb.classes %}
+    <tr><td>{{ k.classe }}</td><td>{% if k.titulaire %}{{ k.titulaire }}{% else %}<span class="badge impaye">Non désigné</span>{% endif %}</td>
+        <td class="nb">{{ k.effectif }}</td>
+        {% if tb.annee_en_cours %}<td class="nb">{{ k.presents }}</td><td class="nb">{{ k.absents }}</td>{% endif %}
+        <td class="nb">{{ ('%.0f' % k.taux_reussite ~ ' %') if k.taux_reussite is not none else '—' }}</td></tr>
+  {% endfor %}
+  <tr class="total"><td>Total</td><td></td><td class="nb">{{ tb.effectif.eleves }}</td>{% if tb.annee_en_cours %}<td class="nb">{{ tb.jour.presents }}</td><td class="nb">{{ tb.jour.absents }}</td>{% endif %}<td></td></tr></tbody>
+</table>
+{% else %}<p class="sous" style="margin:0">Aucune classe du secondaire et humanitaire n'a d'élèves inscrits cette année.</p>{% endif %}
+</div>
+{% endif %}
+{% endif %}
+
+{# ------------------------------------------------------------------ 2. suivi des élèves : liste #}
+{% if fonction == 'suivi' and liste is not none %}
+<form method="get" class="carte">
+  <input type="hidden" name="f" value="suivi">
+  <div class="ligne">
+    <select name="annee" aria-label="Année scolaire" style="max-width:160px">
+      {% for a in annees %}<option value="{{ a }}" {{ 'selected' if a == annee else '' }}>{{ a }}</option>{% endfor %}
+    </select>
+    <select name="classe" aria-label="Classe"><option value="">Toutes les classes</option>
+      {% for k in classes %}<option value="{{ k.n_classe }}" {{ 'selected' if classe == k.n_classe|string else '' }}>{{ k.designation }}</option>{% endfor %}
+    </select>
+    <input type="search" name="q" value="{{ q }}" placeholder="Nom, postnom, prénom ou matricule" aria-label="Rechercher un élève">
+    <button type="submit">Rechercher</button>
+  </div>
+</form>
+<div class="espace"></div>
+<div class="carte defile">
+{% if liste.eleves %}
+<table class="tableau">
+  <thead><tr><th>Matricule</th><th>Élève</th><th>Sexe</th><th>Classe</th><th></th></tr></thead>
+  <tbody>{% for e in liste.eleves %}
+    <tr><td>{{ e.matricule }}</td><td>{{ e.nom_complet }}{% if not e.actif %} <span class="badge partiel">Désactivé</span>{% endif %}</td><td>{{ e.sexe }}</td><td>{{ e.classe }}</td>
+        <td><a class="lien" href="{{ url_for('etudes_sous_menu', sous='prefecture', f='suivi', annee=liste.annee, q=q or none, classe=classe or none, eleve=e.matricule) }}">Ouvrir</a></td></tr>
+  {% endfor %}</tbody>
+</table>
+{% if liste.tronque %}<p class="sous" style="margin:10px 0 0">Seuls les 200 premiers élèves sont affichés : précisez la recherche.</p>{% endif %}
+{% else %}<p class="sous" style="margin:0">Aucun élève trouvé.</p>{% endif %}
+</div>
+{% endif %}
+
+{# ------------------------------------------------------------------ 2. suivi des élèves : dossier d'un élève #}
+{% if fonction == 'suivi' and dossier %}
+{% set e = dossier.eleve %}
+<p><a class="lien" href="{{ url_for('etudes_sous_menu', sous='prefecture', f='suivi', annee=annee or none, q=q or none, classe=classe or none) }}">&larr; Retour à la liste</a></p>
+<div class="carte">
+  <h2 style="margin:0 0 4px">{{ e.nom_complet }}{% if not e.actif %} <span class="badge partiel">Désactivé</span>{% endif %}</h2>
+  <p class="sous" style="margin:0 0 12px">Matricule {{ e.matricule }}{% if dossier.classe_actuelle %} · {{ dossier.classe_actuelle.classe }}{% if dossier.classe_actuelle.option %} · {{ dossier.classe_actuelle.option }}{% endif %} ({{ dossier.classe_actuelle.annee }}){% endif %}</p>
+  <h3 class="sec" style="margin-top:0">Profil</h3>
+  <dl class="infos">
+    <div><dt>Sexe</dt><dd>{{ e.sexe or '—' }}</dd></div>
+    <div><dt>Date de naissance</dt><dd>{{ e.naissance or '—' }}</dd></div>
+    <div><dt>Lieu de naissance</dt><dd>{{ e.lieu_naissance or '—' }}</dd></div>
+    <div><dt>Nationalité</dt><dd>{{ e.nationalite or '—' }}</dd></div>
+    <div><dt>Adresse</dt><dd>{{ e.adresse or '—' }}</dd></div>
+    <div><dt>Téléphone</dt><dd>{{ e.telephone or '—' }}</dd></div>
+    <div><dt>Tuteur</dt><dd>{{ e.tuteur or '—' }}</dd></div>
+    <div><dt>Téléphone du tuteur</dt><dd>{{ e.tel_tuteur or '—' }}</dd></div>
+  </dl>
+</div>
+
+<h3 class="sec">Dossier scolaire</h3>
+<div class="carte defile"><table class="tableau">
+  <thead><tr><th>Année</th><th>Classe</th><th>Statut</th><th class="nb">Résultat</th><th class="nb">Rang</th><th>Décision</th><th class="nb">Jours présents</th><th class="nb">Jours absents</th></tr></thead>
+  <tbody>{% for d in dossier.dossier %}
+    <tr><td>{{ d.annee }}</td><td>{{ d.classe }}{% if d.option %} · {{ d.option }}{% endif %}</td><td>{{ d.statut|capitalize }}</td>
+        <td class="nb">{{ ('%.1f' % d.pct ~ ' %') if d.pct is not none else '—' }}</td>
+        <td class="nb">{% if d.rang %}{{ d.rang }}{% if d.effectif %} / {{ d.effectif }}{% endif %}{% else %}—{% endif %}</td>
+        <td>{{ d.decision or '—' }}{% if d.mention %} · {{ d.mention }}{% endif %}</td>
+        <td class="nb">{{ d.presences.presents if d.presences else '—' }}</td><td class="nb">{{ d.presences.absents if d.presences else '—' }}</td></tr>
+  {% endfor %}</tbody></table></div>
+
+{% if dossier.resultats %}
+<h3 class="sec">Résultats {{ dossier.resultats.annee }} · {{ dossier.resultats.classe }}</h3>
+<div class="carte defile"><table class="tableau">
+  <thead><tr><th>Période</th><th class="nb">Pourcentage</th><th class="nb">Rang</th><th>Résultat</th><th>Conduite</th></tr></thead>
+  <tbody>{% for l in dossier.resultats.lignes %}
+    <tr{% if l.type in ('semestre', 'annee') %} class="groupe"{% endif %}><td>{{ l.libelle }}</td><td class="nb">{{ '%.1f' % l.pct }} %</td><td class="nb">{{ l.rang or '—' }}</td><td>{{ l.resultat or '—' }}</td><td>{{ l.conduite or '—' }}</td></tr>
+  {% endfor %}</tbody></table>
+  <p class="sous" style="margin:10px 0 0">Seuil de réussite : {{ '%.0f' % dossier.resultats.seuil }} %.</p></div>
+{% endif %}
+
+<h3 class="sec">Historique des absences</h3>
+<div class="carte">
+  {% if dossier.absences %}
+  <table class="tableau"><thead><tr><th>Date</th><th>Cours manqués</th></tr></thead>
+  <tbody>{% for a in dossier.absences %}<tr><td>{{ a.date }}</td><td>{{ a.cours|join(', ') }}</td></tr>{% endfor %}</tbody></table>
+  <p class="sous" style="margin:10px 0 0">Les 10 dernières journées d'absence, d'après les pointages des professeurs.</p>
+  {% else %}<p class="sous" style="margin:0">Aucune absence enregistrée.</p>{% endif %}
+</div>
+{% endif %}
+
+{# ------------------------------------------------------------------ 3. situation financière : liste #}
+{% if fonction == 'finances' and fin is not none %}
+<div class="alerte info" style="margin:0 0 12px">Consultation seule : aucun encaissement ni modification ne se fait ici. Les paiements se font dans le module « Paiement des frais ».</div>
+<form method="get" class="carte">
+  <input type="hidden" name="f" value="finances">
+  <div class="ligne">
+    <select name="annee" aria-label="Année scolaire" style="max-width:160px">
+      {% for a in annees %}<option value="{{ a }}" {{ 'selected' if a == annee else '' }}>{{ a }}</option>{% endfor %}
+    </select>
+    <select name="classe" aria-label="Classe"><option value="">Toutes les classes</option>
+      {% for k in classes %}<option value="{{ k.n_classe }}" {{ 'selected' if classe == k.n_classe|string else '' }}>{{ k.designation }}</option>{% endfor %}
+    </select>
+    <select name="filtre" aria-label="Situation">
+      <option value="" {{ 'selected' if not filtre else '' }}>Tous les élèves</option>
+      <option value="dette" {{ 'selected' if filtre == 'dette' else '' }}>Avec dette</option>
+      <option value="regle" {{ 'selected' if filtre == 'regle' else '' }}>En règle</option>
+    </select>
+    <input type="search" name="q" value="{{ q }}" placeholder="Nom, postnom, prénom ou matricule" aria-label="Rechercher un élève">
+    <button type="submit">Afficher</button>
+  </div>
+</form>
+<div class="espace"></div>
+{% if not fin.annee %}
+<div class="carte"><p class="sous" style="margin:0">Aucune année scolaire n'est encore enregistrée.</p></div>
+{% else %}
+<div class="chiffres">
+  <div class="chiffre"><b>{{ fin.resume.eleves }}</b><span>Élèves inscrits</span></div>
+  <div class="chiffre vert"><b>{{ fin.resume.en_regle }}</b><span>En règle</span></div>
+  <div class="chiffre rouge"><b>{{ fin.resume.avec_dette }}</b><span>Avec dette</span></div>
+</div>
+{% if fin.resume.devises %}
+<div class="carte defile"><table class="tableau">
+  <thead><tr><th>Devise</th><th class="nb">Frais dus</th><th class="nb">Payé</th><th class="nb">Reste à payer</th></tr></thead>
+  <tbody>{% for d in fin.resume.devises %}
+    <tr><td>{{ d.devise }}</td><td class="nb">{{ d.du }}</td><td class="nb">{{ d.paye }}</td><td class="nb">{{ d.reste }}</td></tr>
+  {% endfor %}</tbody>
+</table>
+{% if fin.resume.autres_annees %}<p class="sous" style="margin:10px 0 0">Dettes d'autres années scolaires :
+  {% for a in fin.resume.autres_annees %}{{ a.reste }} {{ a.devise }}{{ ', ' if not loop.last else '' }}{% endfor %}.</p>{% endif %}
+</div>
+<div class="espace"></div>
+{% endif %}
+<div class="carte defile">
+{% if fin.eleves %}
+<table class="tableau">
+  <thead><tr><th>Matricule</th><th>Élève</th><th>Classe</th><th class="nb">Dû</th><th class="nb">Payé</th><th class="nb">Reste</th><th>Situation</th><th></th></tr></thead>
+  <tbody>{% for e in fin.eleves %}
+    <tr><td>{{ e.matricule }}</td><td>{{ e.nom_complet }}{% if not e.actif %} <span class="badge partiel">Désactivé</span>{% endif %}</td><td>{{ e.classe }}</td>
+        <td class="nb">{% for d in e.devises %}<div>{{ d.du }} {{ d.devise }}</div>{% else %}—{% endfor %}</td>
+        <td class="nb">{% for d in e.devises %}<div>{{ d.paye }} {{ d.devise }}</div>{% else %}—{% endfor %}</td>
+        <td class="nb">{% for d in e.devises %}<div>{{ d.reste }} {{ d.devise }}</div>{% else %}—{% endfor %}</td>
+        <td>{% if e.dette %}<span class="badge impaye">Dette</span>{% elif e.rien_a_payer %}<span class="badge partiel">Aucun frais</span>{% else %}<span class="badge solde">En règle</span>{% endif %}
+            {% if e.autres_annees %}<div class="sous" style="font-size:.78rem">Autre année : {% for a in e.autres_annees %}{{ a.annee }} ({{ a.reste }} {{ a.devise }}){{ ', ' if not loop.last else '' }}{% endfor %}</div>{% endif %}</td>
+        <td><a class="lien" href="{{ url_for('etudes_sous_menu', sous='prefecture', f='finances', annee=fin.annee, q=q or none, classe=classe or none, filtre=filtre or none, eleve=e.matricule) }}">Détail</a></td></tr>
+  {% endfor %}</tbody>
+</table>
+{% if fin.tronque %}<p class="sous" style="margin:10px 0 0">Seuls les 200 premiers élèves sont affichés : précisez la recherche. Les totaux ci-dessus portent sur tous les élèves.</p>{% endif %}
+{% else %}<p class="sous" style="margin:0">Aucun élève trouvé.</p>{% endif %}
+</div>
+{% endif %}
+{% endif %}
+
+{# ------------------------------------------------------------------ 3. situation financière : détail d'un élève #}
+{% if fonction == 'finances' and fin_eleve %}
+{% set e = fin_eleve.eleve %}
+<p><a class="lien" href="{{ url_for('etudes_sous_menu', sous='prefecture', f='finances', annee=fin_eleve.annee or none, q=q or none, classe=classe or none, filtre=filtre or none) }}">&larr; Retour à la liste</a></p>
+<div class="alerte info" style="margin:0 0 12px">Consultation seule : aucun encaissement ni modification ne se fait ici.</div>
+<div class="carte">
+  <h2 style="margin:0 0 4px">{{ e.nom_complet }}{% if not e.actif %} <span class="badge partiel">Désactivé</span>{% endif %}</h2>
+  <p class="sous" style="margin:0 0 12px">Matricule {{ e.matricule }}{% if fin_eleve.classe %} · {{ fin_eleve.classe }}{% endif %}
+    {% if fin_eleve.en_regle %}· <span class="badge solde">En règle</span>{% else %}· <span class="badge impaye">Dette</span>{% endif %}</p>
+  <form method="get" class="ligne" style="margin:0 0 12px">
+    <input type="hidden" name="f" value="finances"><input type="hidden" name="eleve" value="{{ e.matricule }}">
+    <label for="annee-fin" style="margin:0">Année scolaire</label>
+    <select id="annee-fin" name="annee" onchange="this.form.submit()" style="max-width:180px">
+      {% for a in fin_eleve.annees %}<option value="{{ a }}" {{ 'selected' if a == fin_eleve.annee else '' }}>{{ a }}</option>{% endfor %}
+    </select>
+    <noscript><button type="submit">Afficher</button></noscript>
+  </form>
+  {% if fin_eleve.frais %}
+  <div class="defile"><table class="tableau">
+    <thead><tr><th>Frais</th><th>Devise</th><th class="nb">Dû</th><th class="nb">Payé</th><th class="nb">Reste</th><th>Statut</th><th>Mode</th></tr></thead>
+    <tbody>{% for l in fin_eleve.frais %}
+      <tr><td>{{ l.designation }}</td><td>{{ l.devise }}</td><td class="nb">{{ l.du }}</td><td class="nb">{{ l.paye }}</td><td class="nb">{{ l.reste }}</td>
+          <td><span class="badge {{ 'solde' if l.statut == 'Soldé' else ('partiel' if l.statut == 'Partiel' else 'impaye') }}">{{ l.statut }}</span></td><td>{{ l.mode }}</td></tr>
+    {% endfor %}
+    {% for t in fin_eleve.totaux %}
+      <tr class="total"><td>Total</td><td>{{ t.devise }}</td><td class="nb">{{ t.du }}</td><td class="nb">{{ t.paye }}</td><td class="nb">{{ t.reste }}</td><td></td><td></td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="sous" style="margin:0">Aucun frais n'est dû pour cette année (élève non inscrit, ou aucun tarif défini).</p>{% endif %}
+  {% if fin_eleve.autres_annees %}
+  <h3 class="sec">Dettes d'autres années</h3>
+  <ul style="margin:0;padding-left:18px">{% for a in fin_eleve.autres_annees %}<li>{{ a.annee }} : {{ a.reste }} {{ a.devise }}</li>{% endfor %}</ul>
+  {% endif %}
+</div>
+{% endif %}
+
+{# ------------------------------------------------------------------ renvoi d'élèves #}
+{% if fonction == 'renvois' and renvois is not none %}
+<div class="carte"><p class="sous" style="margin:0">Un élève renvoyé <b>reste dans les archives</b> avec la mention « Renvoyé » : son identité, ses reçus, ses notes et ses documents sont conservés. Il quitte les classes, les listes de présence et le contrôle numérique, et sa carte n'est plus valable. Son <b>matricule est libéré</b> : son dossier passe sous une clé d'archive (ex. 0007/26-R) et l'ancien numéro peut être donné à un autre élève inscrit la même année. Un renvoi ne peut pas être annulé.</p></div>
+<div class="espace"></div>
+{% if peut_renvoyer %}
+<details class="carte" {{ 'open' if form else '' }}>
+  <summary style="cursor:pointer;font-weight:700">Renvoyer un élève</summary>
+  <form method="post" action="{{ url_for('etudes_renvoi_enregistrer') }}" style="margin-top:12px"
+        onsubmit="return confirm('Renvoyer définitivement l\'élève ' + this.matricule.value + ' ?\nSon matricule sera libéré et cette action ne peut pas être annulée.')">
+    <div class="ligne">
+      <div style="flex:1;min-width:150px"><label for="r-mat">Matricule de l'élève</label>
+        <input id="r-mat" type="text" name="matricule" maxlength="30" required value="{{ form.get('matricule', '') }}" placeholder="Ex. 0001/26"></div>
+      <div style="flex:1;min-width:150px"><label for="r-date">Date du renvoi</label>
+        <input id="r-date" type="date" name="date" value="{{ form.get('date') or aujourdhui }}" max="{{ aujourdhui }}" required></div>
+      <div style="flex:1;min-width:150px"><label for="r-annee">Année scolaire</label>
+        <select id="r-annee" name="annee"><option value="">Année en cours</option>
+          {% for a in annees %}<option value="{{ a }}" {{ 'selected' if form.get('annee') == a else '' }}>{{ a }}</option>{% endfor %}</select></div>
+    </div>
+    <label for="r-motif">Motif du renvoi</label>
+    <textarea id="r-motif" name="motif" rows="4" maxlength="4000" required style="width:100%">{{ form.get('motif', '') }}</textarea>
+    <div style="margin-top:10px"><button type="submit">Renvoyer l'élève</button></div>
+  </form>
+</details>
+<div class="espace"></div>
+{% endif %}
+<h3 class="sec">Élèves renvoyés</h3>
+<div class="carte">
+{% if renvois %}
+  {% for r in renvois %}
+  <div style="padding:10px 0;{{ 'border-top:1px solid var(--bord);' if not loop.first else '' }}">
+    <div><b>{{ r.eleve }}</b> <span class="badge impaye">Renvoyé</span></div>
+    <div class="sous" style="font-size:.85rem">Le {{ r.date }}{% if r.annee %} · {{ r.annee }}{% endif %} · décidé par {{ r.par }} · ancien matricule {{ r.ancien_matricule }} · dossier archivé sous {{ r.archive }}
+      · {% if r.reattribue_a %}matricule réattribué à {{ r.reattribue_a }}{% elif r.matricule_libre %}matricule libre{% else %}matricule libéré{% endif %}</div>
+    <p style="margin:6px 0 0;white-space:pre-line">{{ r.motif }}</p>
+  </div>
+  {% endfor %}
+{% else %}<p class="sous" style="margin:0">Aucun élève renvoyé.</p>{% endif %}
+</div>
+{% endif %}
+
+{# ------------------------------------------------------------------ 4. décisions et rapports #}
+{% if fonction == 'decisions' and decisions is not none %}
+<form method="get" class="carte">
+  <input type="hidden" name="f" value="decisions">
+  <div class="ligne">
+    <select name="annee" aria-label="Année scolaire" style="max-width:170px"><option value="">Toutes les années</option>
+      {% for a in annees %}<option value="{{ a }}" {{ 'selected' if a == annee else '' }}>{{ a }}</option>{% endfor %}
+    </select>
+    <select name="categorie" aria-label="Catégorie de décision"><option value="">Toutes les catégories</option>
+      {% for cle, lib in categories %}<option value="{{ cle }}" {{ 'selected' if cle == categorie else '' }}>{{ lib }}</option>{% endfor %}
+    </select>
+    <select name="direction" aria-label="Direction (rapports)"><option value="">Toutes les directions</option>
+      {% for cle, lib in directions %}<option value="{{ cle }}" {{ 'selected' if cle == dir_filtre else '' }}>{{ lib }}</option>{% endfor %}
+    </select>
+    <button type="submit">Filtrer</button>
+  </div>
+</form>
+
+<h3 class="sec">Décisions du Préfet</h3>
+{% if peut_ajout %}
+<details class="carte" {{ 'open' if form else '' }}>
+  <summary style="cursor:pointer;font-weight:700">Enregistrer une décision</summary>
+  <form method="post" action="{{ url_for('etudes_decision_ajouter') }}" style="margin-top:12px">
+    <div class="ligne">
+      <div style="flex:1;min-width:150px"><label for="d-date">Date de la décision</label>
+        <input id="d-date" type="date" name="date" value="{{ form.get('date') or aujourdhui }}" max="{{ aujourdhui }}" required></div>
+      <div style="flex:1;min-width:150px"><label for="d-cat">Catégorie</label>
+        <select id="d-cat" name="categorie">{% for cle, lib in categories %}<option value="{{ cle }}" {{ 'selected' if form.get('categorie') == cle else '' }}>{{ lib }}</option>{% endfor %}</select></div>
+      <div style="flex:1;min-width:150px"><label for="d-annee">Année scolaire</label>
+        <select id="d-annee" name="annee"><option value="">Année en cours</option>
+          {% for a in annees %}<option value="{{ a }}" {{ 'selected' if form.get('annee') == a else '' }}>{{ a }}</option>{% endfor %}</select></div>
+    </div>
+    <label for="d-objet">Objet</label>
+    <input id="d-objet" type="text" name="objet" maxlength="150" required value="{{ form.get('objet', '') }}">
+    <label for="d-mat">Matricule de l'élève concerné (facultatif)</label>
+    <input id="d-mat" type="text" name="matricule" maxlength="30" value="{{ form.get('matricule', '') }}" placeholder="Ex. 0001/26">
+    <label for="d-detail">Détail (facultatif)</label>
+    <textarea id="d-detail" name="detail" rows="4" maxlength="4000" style="width:100%">{{ form.get('detail', '') }}</textarea>
+    <div style="margin-top:10px"><button type="submit">Enregistrer la décision</button></div>
+  </form>
+</details>
+<div class="espace"></div>
+{% endif %}
+<div class="carte">
+{% if decisions.decisions %}
+  {% for d in decisions.decisions %}
+  <div style="padding:10px 0;{{ 'border-top:1px solid var(--bord);' if not loop.first else '' }}">
+    <div><b>{{ d.objet }}</b> {% if d.annulee %}<span class="badge impaye">Annulée</span>{% else %}<span class="badge solde">En vigueur</span>{% endif %}</div>
+    <div class="sous" style="font-size:.85rem">N° {{ d.id }} · {{ d.date }} · {{ d.categorie }}{% if d.annee %} · {{ d.annee }}{% endif %}{% if d.eleve %} · {{ d.eleve }} ({{ d.matricule }}){% endif %} · enregistrée par {{ d.enregistre_par }}</div>
+    {% if d.detail %}<p style="margin:6px 0 0;white-space:pre-line">{{ d.detail }}</p>{% endif %}
+    {% if d.annulee %}<p class="sous" style="margin:6px 0 0;font-size:.85rem">Annulée le {{ d.date_annulation }} par {{ d.annule_par }} : {{ d.motif }}</p>
+    {% elif peut_modif %}
+    <details style="margin-top:6px"><summary style="cursor:pointer;font-size:.85rem">Annuler cette décision</summary>
+      <form method="post" action="{{ url_for('etudes_decision_annuler', numero=d.id) }}" class="ligne" style="margin-top:8px">
+        <input type="text" name="motif" maxlength="4000" required placeholder="Motif de l'annulation" aria-label="Motif de l'annulation">
+        <button type="submit" class="second">Annuler la décision</button>
+      </form></details>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% if decisions.tronque %}<p class="sous" style="margin:10px 0 0">Seules les 200 décisions les plus récentes sont affichées : filtrez par année ou catégorie.</p>{% endif %}
+{% else %}<p class="sous" style="margin:0">Aucune décision enregistrée{{ ' pour ce filtre' if annee or categorie else '' }}.</p>{% endif %}
+</div>
+
+<h3 class="sec">Rapports des responsables</h3>
+<div class="carte">
+{% if rapports %}
+  {% for r in rapports %}
+  <details style="padding:8px 0;{{ 'border-top:1px solid var(--bord);' if not loop.first else '' }}">
+    <summary style="cursor:pointer"><b>{{ r.titre }}</b> <span class="sous" style="font-size:.85rem">· {{ r.direction }} · {{ r.date }}{% if r.annee %} · {{ r.annee }}{% endif %}</span></summary>
+    <p class="sous" style="margin:6px 0 0;font-size:.85rem">Par {{ r.auteur }}</p>
+    <p style="margin:6px 0 0;white-space:pre-line">{{ r.contenu }}</p>
+  </details>
+  {% endfor %}
+{% else %}<p class="sous" style="margin:0">Aucun rapport reçu{{ ' pour ce filtre' if annee or dir_filtre else '' }}. Les rapports envoyés par la Direction des études et la Direction de discipline apparaissent ici (lecture seule).</p>{% endif %}
+</div>
+{% endif %}
+
+{# ------------------------------------------------------------------ 5. consultation de la discipline : liste #}
+{% if fonction == 'discipline' and disc is not none %}
+<div class="alerte info" style="margin:0 0 12px">Consultation seule : les présences sont pointées par les professeurs, la conduite est donnée par les professeurs de chaque cours, les rapports sont envoyés par la Direction de discipline.</div>
+<form method="get" class="carte">
+  <input type="hidden" name="f" value="discipline">
+  <div class="ligne">
+    <select name="annee" aria-label="Année scolaire" style="max-width:160px">
+      {% for a in annees %}<option value="{{ a }}" {{ 'selected' if a == annee else '' }}>{{ a }}</option>{% endfor %}
+    </select>
+    <select name="classe" aria-label="Classe"><option value="">Toutes les classes</option>
+      {% for k in classes %}<option value="{{ k.n_classe }}" {{ 'selected' if classe == k.n_classe|string else '' }}>{{ k.designation }}</option>{% endfor %}
+    </select>
+    <select name="filtre" aria-label="Situation">
+      <option value="" {{ 'selected' if not filtre else '' }}>Tous les élèves</option>
+      <option value="absents" {{ 'selected' if filtre == 'absents' else '' }}>Absents aujourd'hui</option>
+      <option value="repetees" {{ 'selected' if filtre == 'repetees' else '' }}>Absences répétées</option>
+    </select>
+    <input type="search" name="q" value="{{ q }}" placeholder="Nom, postnom, prénom ou matricule" aria-label="Rechercher un élève">
+    <button type="submit">Afficher</button>
+  </div>
+</form>
+<div class="espace"></div>
+{% if not disc.annee %}
+<div class="carte"><p class="sous" style="margin:0">Aucune année scolaire n'est encore enregistrée.</p></div>
+{% else %}
+<div class="chiffres">
+  <div class="chiffre"><b>{{ disc.resume.eleves }}</b><span>Élèves actifs</span></div>
+  {% if disc.annee_en_cours %}
+  <div class="chiffre vert"><b>{{ disc.resume.presents }}</b><span>Présents aujourd'hui</span></div>
+  <div class="chiffre rouge"><b>{{ disc.resume.absents }}</b><span>Absents aujourd'hui</span></div>
+  <div class="chiffre"><b>{{ disc.resume.non_renseignes }}</b><span>Présence non pointée</span></div>
+  {% endif %}
+  <div class="chiffre rouge"><b>{{ disc.resume.absences_repetees }}</b><span>Absences répétées ({{ cfg.SEUIL_ABSENCES_REPETEES }} jours ou plus sur 30 jours)</span></div>
+  <div class="chiffre"><b>{{ disc.resume.decisions }}</b><span>Décisions disciplinaires en vigueur</span></div>
+</div>
+<div class="carte defile">
+{% if disc.eleves %}
+<table class="tableau">
+  <thead><tr><th>Matricule</th><th>Élève</th><th>Classe</th>{% if disc.annee_en_cours %}<th>Aujourd'hui</th>{% endif %}<th class="nb">Jours d'absence (année)</th><th class="nb">Jours d'absence (30 jours)</th><th>Conduite</th><th></th></tr></thead>
+  <tbody>{% for e in disc.eleves %}
+    <tr><td>{{ e.matricule }}</td><td>{{ e.nom_complet }}{% if not e.actif %} <span class="badge partiel">Désactivé</span>{% endif %}</td><td>{{ e.classe }}</td>
+        {% if disc.annee_en_cours %}<td>{% if e.jour == 'A' %}<span class="badge impaye">Absent</span>{% elif e.jour == 'P' %}<span class="badge solde">Présent</span>{% else %}—{% endif %}</td>{% endif %}
+        <td class="nb">{{ e.absences_annee }}</td>
+        <td class="nb">{{ e.absences_recentes }}{% if e.repetee %} <span class="badge impaye">Répétées</span>{% endif %}</td>
+        <td>{% if e.conduite %}<span class="badge {{ 'impaye' if e.conduite == 'M' else ('partiel' if e.conduite in ('P', 'AB') else 'solde') }}">{{ e.conduite_libelle }}</span>{% else %}—{% endif %}</td>
+        <td><a class="lien" href="{{ url_for('etudes_sous_menu', sous='prefecture', f='discipline', annee=disc.annee, q=q or none, classe=classe or none, filtre=filtre or none, eleve=e.matricule) }}">Ouvrir</a></td></tr>
+  {% endfor %}</tbody>
+</table>
+{% if disc.tronque %}<p class="sous" style="margin:10px 0 0">Seuls les 200 premiers élèves sont affichés : précisez la recherche. Les chiffres ci-dessus portent sur tous les élèves.</p>{% endif %}
+{% else %}<p class="sous" style="margin:0">Aucun élève trouvé.</p>{% endif %}
+</div>
+
+<h3 class="sec">Rapports de la Direction de discipline</h3>
+<div class="carte">
+{% if disc.rapports %}
+  {% for r in disc.rapports %}
+  <details style="padding:8px 0;{{ 'border-top:1px solid var(--bord);' if not loop.first else '' }}">
+    <summary style="cursor:pointer"><b>{{ r.titre }}</b> <span class="sous" style="font-size:.85rem">· {{ r.date }} · {{ r.auteur }}</span></summary>
+    <p style="margin:6px 0 0;white-space:pre-line">{{ r.contenu }}</p>
+  </details>
+  {% endfor %}
+{% else %}<p class="sous" style="margin:0">Aucun rapport de la Direction de discipline pour cette année.</p>{% endif %}
+</div>
+
+<h3 class="sec">Décisions disciplinaires du Préfet</h3>
+<div class="carte">
+{% if disc.decisions %}
+  {% for d in disc.decisions %}
+  <div style="padding:8px 0;{{ 'border-top:1px solid var(--bord);' if not loop.first else '' }}">
+    <div><b>{{ d.objet }}</b> {% if d.annulee %}<span class="badge impaye">Annulée</span>{% else %}<span class="badge solde">En vigueur</span>{% endif %}</div>
+    <div class="sous" style="font-size:.85rem">N° {{ d.id }} · {{ d.date }}{% if d.eleve %} · {{ d.eleve }} ({{ d.matricule }}){% endif %}</div>
+    {% if d.detail %}<p style="margin:6px 0 0;white-space:pre-line">{{ d.detail }}</p>{% endif %}
+  </div>
+  {% endfor %}
+{% else %}<p class="sous" style="margin:0">Aucune décision disciplinaire pour cette année. Elles s'enregistrent dans « Décisions et rapports ».</p>{% endif %}
+</div>
+<p class="sous" style="margin:12px 0 0">Les justificatifs d'absence, les retards et les incidents ne sont pas encore enregistrés dans le logiciel : ils apparaîtront ici dès que la Direction de discipline pourra les saisir.</p>
+{% endif %}
+{% endif %}
+
+{# ------------------------------------------------------------------ 5. consultation de la discipline : un élève #}
+{% if fonction == 'discipline' and disc_eleve %}
+{% set e = disc_eleve.eleve %}
+<p><a class="lien" href="{{ url_for('etudes_sous_menu', sous='prefecture', f='discipline', annee=disc_eleve.annee or none, q=q or none, classe=classe or none, filtre=filtre or none) }}">&larr; Retour à la liste</a></p>
+<div class="carte">
+  <h2 style="margin:0 0 4px">{{ e.nom_complet }}{% if not e.actif %} <span class="badge partiel">Désactivé</span>{% endif %}</h2>
+  <p class="sous" style="margin:0 0 12px">Matricule {{ e.matricule }}{% if disc_eleve.classe %} · {{ disc_eleve.classe }}{% endif %}</p>
+  <form method="get" class="ligne" style="margin:0 0 12px">
+    <input type="hidden" name="f" value="discipline"><input type="hidden" name="eleve" value="{{ e.matricule }}">
+    <label for="annee-disc" style="margin:0">Année scolaire</label>
+    <select id="annee-disc" name="annee" onchange="this.form.submit()" style="max-width:180px">
+      {% for a in disc_eleve.annees %}<option value="{{ a }}" {{ 'selected' if a == disc_eleve.annee else '' }}>{{ a }}</option>{% endfor %}
+    </select>
+    <noscript><button type="submit">Afficher</button></noscript>
+  </form>
+  <div class="chiffres" style="margin:0">
+    <div class="chiffre vert"><b>{{ disc_eleve.jours_presents }}</b><span>Jours présents</span></div>
+    <div class="chiffre rouge"><b>{{ disc_eleve.jours_absents }}</b><span>Jours d'absence</span></div>
+  </div>
+</div>
+
+<h3 class="sec">Conduite</h3>
+<div class="carte defile">
+{% if disc_eleve.conduite %}
+  <table class="tableau"><thead><tr><th>Semestre</th><th>Période</th><th>Conduite</th><th class="nb">Cours ayant donné une cote</th></tr></thead>
+  <tbody>{% for c in disc_eleve.conduite %}
+    <tr><td>{{ c.semestre }}</td><td>{{ c.periode }}</td>
+        <td>{% if c.cote %}<span class="badge {{ 'impaye' if c.cote == 'M' else ('partiel' if c.cote in ('P', 'AB') else 'solde') }}">{{ c.libelle }}</span>{% else %}—{% endif %}</td>
+        <td class="nb">{{ c.nb_cours }}</td></tr>
+  {% endfor %}</tbody></table>
+  <p class="sous" style="margin:10px 0 0">Cote la plus fréquente parmi les cours ; à égalité, la plus faible (règle du bulletin).</p>
+{% else %}<p class="sous" style="margin:0">Les semestres et périodes de cette année ne sont pas encore définis.</p>{% endif %}
+</div>
+
+<h3 class="sec">Absences</h3>
+<div class="carte">
+  {% if disc_eleve.absences %}
+  <table class="tableau"><thead><tr><th>Date</th><th>Cours manqués</th></tr></thead>
+  <tbody>{% for a in disc_eleve.absences %}<tr><td>{{ a.date }}</td><td>{{ a.cours|join(', ') }}</td></tr>{% endfor %}</tbody></table>
+  {% if disc_eleve.jours_absents > 30 %}<p class="sous" style="margin:10px 0 0">Les 30 dernières journées d'absence sont affichées sur {{ disc_eleve.jours_absents }}.</p>{% endif %}
+  {% else %}<p class="sous" style="margin:0">Aucune absence enregistrée pour cette année.</p>{% endif %}
+</div>
+
+<h3 class="sec">Décisions disciplinaires le concernant</h3>
+<div class="carte">
+{% if disc_eleve.decisions %}
+  {% for d in disc_eleve.decisions %}
+  <div style="padding:8px 0;{{ 'border-top:1px solid var(--bord);' if not loop.first else '' }}">
+    <div><b>{{ d.objet }}</b> {% if d.annulee %}<span class="badge impaye">Annulée</span>{% else %}<span class="badge solde">En vigueur</span>{% endif %}</div>
+    <div class="sous" style="font-size:.85rem">N° {{ d.id }} · {{ d.date }}{% if d.annee %} · {{ d.annee }}{% endif %}</div>
+    {% if d.detail %}<p style="margin:6px 0 0;white-space:pre-line">{{ d.detail }}</p>{% endif %}
+  </div>
+  {% endfor %}
+{% else %}<p class="sous" style="margin:0">Aucune décision disciplinaire ne concerne cet élève.</p>{% endif %}
+</div>
+<p class="sous" style="margin:12px 0 0">Les justificatifs d'absence, les retards et les incidents ne sont pas encore enregistrés dans le logiciel.</p>
+{% endif %}
+
+{# ------------------------------------------------------------------ 6. consultation des études : classes et résultats #}
+{% if fonction == 'etudes' and etu is not none %}
+<div class="alerte info" style="margin:0 0 12px">Consultation seule : les points sont saisis par les professeurs et les résultats sont calculés automatiquement. Le Préfet ne gère pas les notes.</div>
+<form method="get" class="carte">
+  <input type="hidden" name="f" value="etudes">
+  <div class="ligne">
+    <select name="annee" aria-label="Année scolaire" style="max-width:160px" onchange="this.form.classe.value='';this.form.submit()">
+      {% for a in etu.annees %}<option value="{{ a }}" {{ 'selected' if a == etu.annee else '' }}>{{ a }}</option>{% endfor %}
+    </select>
+    {% if etu.detail %}<a class="lien" href="{{ url_for('etudes_sous_menu', sous='prefecture', f='etudes', annee=etu.annee) }}">&larr; Toutes les classes</a>{% endif %}
+    <noscript><button type="submit">Afficher</button></noscript>
+  </div>
+  {% if etu.detail %}<input type="hidden" name="classe" value="{{ etu.detail.n_classe }}">{% else %}<input type="hidden" name="classe" value="">{% endif %}
+</form>
+<div class="espace"></div>
+{% if not etu.annee %}
+<div class="carte"><p class="sous" style="margin:0">Aucune année scolaire n'est encore enregistrée.</p></div>
+{% elif not etu.detail %}
+<div class="carte defile">
+{% if etu.classes %}
+<table class="tableau">
+  <thead><tr><th>Classe</th><th>Titulaire</th><th class="nb">Élèves</th><th class="nb">Cours</th><th class="nb">Moyenne</th><th class="nb">Réussite</th><th class="nb">Réussis</th><th class="nb">Échecs</th><th class="nb">En attente</th><th class="nb">Points manquants</th><th></th></tr></thead>
+  <tbody>{% for k in etu.classes %}
+    <tr><td>{{ k.classe }}</td><td>{% if k.titulaire %}{{ k.titulaire }}{% else %}<span class="badge impaye">Non désigné</span>{% endif %}</td>
+        <td class="nb">{{ k.effectif }}</td>
+        <td class="nb">{{ k.cours }}{% if k.sans_professeur %} <span class="badge partiel">{{ k.sans_professeur }} sans professeur</span>{% endif %}</td>
+        <td class="nb">{{ ('%.1f' % k.moyenne ~ ' %') if k.moyenne is not none else '—' }}</td>
+        <td class="nb">{{ ('%.0f' % k.taux ~ ' %') if k.taux is not none else '—' }}</td>
+        <td class="nb">{{ k.reussis }}</td><td class="nb">{{ k.echecs }}</td><td class="nb">{{ k.en_attente }}</td>
+        <td class="nb">{% if not k.calendrier %}<span class="badge partiel">Calendrier non défini</span>{% else %}{{ k.alertes }}{% endif %}</td>
+        <td><a class="lien" href="{{ url_for('etudes_sous_menu', sous='prefecture', f='etudes', annee=etu.annee, classe=k.n_classe) }}">Ouvrir</a></td></tr>
+  {% endfor %}</tbody>
+</table>
+<p class="sous" style="margin:10px 0 0">Moyenne, réussite, réussis, échecs et « en attente » portent sur l'année scolaire (seuil de réussite : {{ '%.0f' % cfg.SEUIL_REUSSITE }} %).</p>
+{% else %}<p class="sous" style="margin:0">Aucune classe du secondaire et humanitaire n'a d'élèves inscrits cette année.</p>{% endif %}
+</div>
+{% else %}
+{% set d = etu.detail %}
+<div class="carte">
+  <h2 style="margin:0 0 4px">{{ d.classe }}</h2>
+  <p class="sous" style="margin:0 0 12px">Année {{ etu.annee }} · Titulaire : {% if d.titulaire %}{{ d.titulaire }}{% else %}<span class="badge impaye">Non désigné</span>{% endif %}</p>
+  {% if d.portees %}
+  <form method="get" class="ligne" style="margin:0">
+    <input type="hidden" name="f" value="etudes"><input type="hidden" name="annee" value="{{ etu.annee }}"><input type="hidden" name="classe" value="{{ d.n_classe }}">
+    <label for="cle-etu" style="margin:0">Résultats de</label>
+    <select id="cle-etu" name="cle" onchange="this.form.submit()">
+      {% for p in d.portees %}<option value="{{ p.cle }}" {{ 'selected' if p.cle == d.cle else '' }}>{{ p.libelle }}</option>{% endfor %}
+    </select>
+    <noscript><button type="submit">Afficher</button></noscript>
+  </form>
+  {% else %}<p class="sous" style="margin:0">Les semestres et périodes de cette année ne sont pas encore définis : aucun résultat à afficher.</p>{% endif %}
+</div>
+{% if d.stats %}
+<div class="espace"></div>
+<div class="chiffres">
+  <div class="chiffre"><b>{{ d.effectif }}</b><span>Élèves</span></div>
+  <div class="chiffre"><b>{{ ('%.1f' % d.stats.moyenne ~ ' %') if d.stats.moyenne is not none else '—' }}</b><span>Moyenne de la classe</span></div>
+  <div class="chiffre vert"><b>{{ d.stats.reussis }}</b><span>Réussis</span></div>
+  <div class="chiffre rouge"><b>{{ d.stats.echecs }}</b><span>Échecs</span></div>
+  <div class="chiffre"><b>{{ d.stats.en_attente }}</b><span>En attente</span></div>
+  <div class="chiffre"><b>{{ ('%.0f' % d.stats.taux ~ ' %') if d.stats.taux is not none else '—' }}</b><span>Taux de réussite</span></div>
+</div>
+{% endif %}
+
+<h3 class="sec">Résultats · {{ d.portee or 'aucune période' }}</h3>
+<div class="carte defile">
+{% if d.eleves %}
+<table class="tableau">
+  <thead><tr><th class="nb">Rang</th><th>Élève</th><th class="nb">Points</th><th class="nb">Pourcentage</th><th>Résultat</th><th>Mention</th><th>Conduite</th><th></th></tr></thead>
+  <tbody>{% for e in d.eleves %}
+    <tr><td class="nb">{{ e.rang or '—' }}</td><td>{{ e.nom_complet }}</td>
+        <td class="nb">{% if e.obtenu is not none %}{{ e.obtenu }} / {{ e.max }}{% else %}—{% endif %}</td>
+        <td class="nb">{{ ('%.1f' % e.pct ~ ' %') if e.pct is not none else '—' }}</td>
+        <td><span class="badge {{ 'solde' if e.reussite is true else ('impaye' if e.reussite is false else 'partiel') }}">{{ e.resultat or '—' }}</span></td>
+        <td>{{ e.mention or '—' }}</td><td>{{ e.conduite or '—' }}</td>
+        <td><a class="lien" href="{{ url_for('etudes_sous_menu', sous='prefecture', f='etudes', annee=etu.annee, classe=d.n_classe, cle=d.cle, eleve=e.matricule) }}">Bulletin</a></td></tr>
+  {% endfor %}</tbody>
+</table>
+<p class="sous" style="margin:10px 0 0">Seuil de réussite : {{ '%.0f' % d.seuil }} %. Classés dans l'ordre des réussites, puis des échecs, puis des résultats en attente.</p>
+{% else %}<p class="sous" style="margin:0">Aucun élève ou aucun résultat à afficher.</p>{% endif %}
+</div>
+
+<h3 class="sec">Situation pédagogique : cours et professeurs</h3>
+<div class="carte defile">
+{% if d.cours %}
+<table class="tableau">
+  <thead><tr><th>Cours</th><th>Professeur</th><th class="nb">Heures par semaine</th><th class="nb">Élèves notés</th><th class="nb">Moyenne de la classe</th></tr></thead>
+  <tbody>{% for c in d.cours %}
+    <tr><td>{{ c.libelle }}</td><td>{% if c.professeur %}{{ c.professeur }}{% else %}<span class="badge impaye">Aucun professeur</span>{% endif %}</td>
+        <td class="nb">{{ c.heures or '—' }}</td><td class="nb">{{ c.notes }}</td>
+        <td class="nb">{{ ('%.1f' % c.moyenne ~ ' %') if c.moyenne is not none else '—' }}</td></tr>
+  {% endfor %}</tbody>
+</table>
+{% else %}<p class="sous" style="margin:0">Aucun cours n'est ouvert dans cette classe pour cette année.</p>{% endif %}
+</div>
+
+<h3 class="sec">Ce qui manque encore ({{ d.nb_alertes }})</h3>
+{% if d.alertes %}
+<ul class="liste-alertes">{% for a in d.alertes %}<li class="alerte">{{ a }}</li>{% endfor %}</ul>
+{% if d.nb_alertes > d.alertes|length %}<p class="sous" style="margin:6px 0 0">Les {{ d.alertes|length }} premières sont affichées sur {{ d.nb_alertes }}.</p>{% endif %}
+{% else %}<div class="succes">Rien ne manque : cours, professeurs et points sont complets.</div>{% endif %}
+{% endif %}
+{% endif %}
+
+{# ------------------------------------------------------------------ 6. consultation des études : bulletin d'un élève #}
+{% if fonction == 'etudes' and bulletin %}
+{% set e = bulletin.eleve %}
+<p><a class="lien" href="{{ url_for('etudes_sous_menu', sous='prefecture', f='etudes', annee=bulletin.annee or none, classe=bulletin.n_classe) }}">&larr; Retour à la classe</a></p>
+<div class="alerte info" style="margin:0 0 12px">Consultation seule : aucune note ne se saisit ni ne se modifie ici.</div>
+<div class="carte">
+  <h2 style="margin:0 0 4px">Bulletin · {{ e.nom_complet }}{% if not e.actif %} <span class="badge partiel">Désactivé</span>{% endif %}</h2>
+  <p class="sous" style="margin:0 0 12px">Matricule {{ e.matricule }} · {{ bulletin.classe }} · Titulaire : {{ bulletin.titulaire or 'non désigné' }}</p>
+  <form method="get" class="ligne" style="margin:0 0 12px">
+    <input type="hidden" name="f" value="etudes"><input type="hidden" name="eleve" value="{{ e.matricule }}">
+    <label for="annee-bul" style="margin:0">Année scolaire</label>
+    <select id="annee-bul" name="annee" onchange="this.form.submit()" style="max-width:180px">
+      {% for a in bulletin.annees %}<option value="{{ a }}" {{ 'selected' if a == bulletin.annee else '' }}>{{ a }}</option>{% endfor %}
+    </select>
+    <noscript><button type="submit">Afficher</button></noscript>
+  </form>
+  <div class="defile"><table class="tableau">
+    <thead><tr><th>Cours</th>{% for col in bulletin.colonnes %}<th class="nb">{{ col.libelle }}</th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for c in bulletin.cours %}
+      <tr><td>{{ c.libelle }}{% if c.professeur %}<div class="sous" style="font-size:.78rem">{{ c.professeur }}</div>{% endif %}</td>
+        {% for col in bulletin.colonnes %}{% set v = c.cotes.get(col.cle) %}
+        <td class="nb">{% if v %}{{ v.obtenu }} / {{ v.max }}{% if v.pct is not none %}<div class="sous" style="font-size:.78rem">{{ '%.1f' % v.pct }} %</div>{% endif %}{% else %}—{% endif %}</td>
+        {% endfor %}</tr>
+    {% endfor %}
+    {% set t = bulletin.totaux %}
+      <tr class="total"><td>Total</td>{% for col in bulletin.colonnes %}{% set v = t[col.cle] %}<td class="nb">{% if v.obtenu is not none %}{{ v.obtenu }} / {{ v.max }}{% else %}—{% endif %}</td>{% endfor %}</tr>
+      <tr class="total"><td>Pourcentage</td>{% for col in bulletin.colonnes %}{% set v = t[col.cle] %}<td class="nb">{{ ('%.1f' % v.pct ~ ' %') if v.pct is not none else '—' }}</td>{% endfor %}</tr>
+      <tr class="total"><td>Rang (sur {{ bulletin.effectif }})</td>{% for col in bulletin.colonnes %}{% set v = t[col.cle] %}<td class="nb">{{ v.rang or '—' }}</td>{% endfor %}</tr>
+      <tr class="total"><td>Résultat</td>{% for col in bulletin.colonnes %}{% set v = t[col.cle] %}<td class="nb">{{ v.resultat or '—' }}{% if v.mention %}<div class="sous" style="font-size:.78rem">{{ v.mention }}</div>{% endif %}</td>{% endfor %}</tr>
+      <tr class="total"><td>Conduite</td>{% for col in bulletin.colonnes %}{% set v = t[col.cle] %}<td class="nb">{{ v.conduite or '—' }}</td>{% endfor %}</tr>
+    </tbody>
+  </table></div>
+  <p class="sous" style="margin:10px 0 0">Seuil de réussite : {{ '%.0f' % bulletin.seuil }} %.</p>
+</div>
+{% endif %}
+
+{% if fonction == 'proclamation' and pr %}{% include "_etudes_proclamation.html" %}{% endif %}
+{% if fonction == 'documents' and docs %}{% include "_etudes_documents.html" %}{% endif %}
+{% if fonction == 'listes' and liste_eleves %}{% set ESP = 'prefecture' %}{% include "_etudes_secretariat_listes.html" %}{% endif %}

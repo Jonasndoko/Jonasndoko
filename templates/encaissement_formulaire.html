@@ -1,0 +1,47 @@
+{% extends "encaissement_base.html" %}
+{% block contenu %}
+{% if succes %}<div class="succes" role="status">{{ succes }}</div>{% endif %}
+{% if erreur %}<div class="erreur" role="alert">{{ erreur }}</div>{% endif %}
+{% if avertissement %}<div class="alerte" role="alert">{{ avertissement }}</div>{% endif %}
+<form class="carte" method="post" action="/m/encaissement/confirmer">
+  <h2 style="margin:0 0 4px;font-size:1.15rem">Enregistrement de l'encaissement</h2>
+  <p class="sous" style="margin-bottom:8px">L'écart (encaissé - versé) est calculé par le système.</p>
+  <label for="perc">Percepteur</label>
+  <select id="perc" name="perc" required>
+    <option value="">— Choisissez —</option>
+    {% for n, nom in percepteurs %}<option value="{{ n }}" {{ 'selected' if saisie.perc == n|string else '' }}>N° {{ n }} - {{ nom }}</option>{% endfor %}
+  </select>
+  <label for="date">Date (jj/mm/aaaa)</label>
+  <input id="date" name="date" value="{{ saisie.date }}" placeholder="08/10/2026" inputmode="numeric" required>
+  <label for="devise">Devise</label>
+  <select id="devise" name="devise" required>
+    <option value="">— Choisissez —</option>
+    {% for code, libelle in devises %}<option value="{{ code }}" {{ 'selected' if saisie.devise == code else '' }}>{{ libelle }}</option>{% endfor %}
+  </select>
+  <label for="encaisse">Montant encaissé</label>
+  <input id="encaisse" name="encaisse" value="{{ saisie.encaisse }}" inputmode="decimal" autocomplete="off" required>
+  <label for="verse">Montant versé</label>
+  <input id="verse" name="verse" value="{{ saisie.verse }}" inputmode="decimal" autocomplete="off" required>
+  <label for="ecart">Écart (calculé : encaissé - versé)</label>
+  <input id="ecart" value="" readonly tabindex="-1" aria-live="polite">
+  <div id="nature" style="font-weight:600;min-height:1.4em"></div>
+  <div class="actions"><button type="submit" {{ 'disabled' if avertissement else '' }}>Continuer</button>
+    <a class="bouton second" href="/m/encaissement">Annuler</a></div>
+</form>
+<script>
+(function(){
+  function c(t){t=(t||"").replace(/[\s\u00a0]/g,"");if(!/^\d{1,12}([.,]\d{1,2})?$/.test(t))return null;
+    var p=t.replace(",",".").split("."),d=((p[1]||"")+"00").slice(0,2);return parseInt(p[0],10)*100+parseInt(d,10);}
+  function f(n){var a=Math.abs(n),e=Math.floor(a/100),k=("0"+(a%100)).slice(-2);
+    return (n<0?"-":"")+String(e).replace(/\B(?=(\d{3})+(?!\d))/g," ")+","+k;}
+  var en=document.getElementById("encaisse"),ve=document.getElementById("verse"),dv=document.getElementById("devise"),
+      ec=document.getElementById("ecart"),na=document.getElementById("nature");
+  function maj(){var a=c(en.value),b=c(ve.value);
+    if(a===null||b===null||a===0){ec.value="";na.textContent="";return;}
+    var e=a-b;ec.value=f(e)+" "+dv.value;
+    na.textContent=e>0?"Manquant":(e<0?"Excédent":"Aucun écart");
+    na.style.color=e>0?"var(--rouge)":(e<0?"var(--vert)":"var(--gris)");}
+  [en,ve,dv].forEach(function(x){x.addEventListener("input",maj);x.addEventListener("change",maj);});maj();
+})();
+</script>
+{% endblock %}

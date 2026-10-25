@@ -1,0 +1,190 @@
+{# Gestion des bulletins : consultation, vérification des moyennes et appréciations, erreurs et données manquantes (gestion_bulletins.py). Lecture seule. #}
+<style>
+.b-pastille{display:inline-block;border-radius:99px;padding:1px 9px;font-size:.78rem;font-weight:600;white-space:nowrap}
+.st-PRET,.g-OK{background:#DDF3E3;color:#1E6B30}.st-A_VERIFIER,.g-ALERTE{background:#FDF0DC;color:#8A5300}.st-BLOQUE,.g-ERREUR{background:#FDECEA;color:var(--rouge)}.st-SANS_OBJET{background:var(--fond);color:var(--gris)}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .st-PRET,:root:not([data-theme=light]) .g-OK{background:#12301B;color:#9BE3B0}:root:not([data-theme=light]) .st-A_VERIFIER,:root:not([data-theme=light]) .g-ALERTE{background:#3A2A0B;color:#FFD9A0}:root:not([data-theme=light]) .st-BLOQUE,:root:not([data-theme=light]) .g-ERREUR{background:#3A1614;color:#FFB4AB}}
+.b-pills{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+.b-pills a{padding:5px 12px;border:1px solid var(--bord);border-radius:99px;text-decoration:none;color:var(--bleu);background:var(--carte);font-size:.88rem}
+.b-pills a.actif{background:var(--bleu);color:#fff;border-color:var(--bleu)}
+.b-filtre{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:end;margin:0 0 12px}
+.b-filtre>div{display:flex;flex-direction:column;gap:2px}.b-filtre label{margin:0;font-size:.8rem;color:var(--gris)}
+.b-filtre select{width:auto;padding:7px 9px}
+.b-chiffres{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:0 0 14px}
+.b-chiffre{background:var(--carte);border:1px solid var(--bord);border-radius:10px;padding:10px 14px}
+.b-chiffre b{display:block;font-size:1.35rem;line-height:1.2}.b-chiffre span{font-size:.78rem;color:var(--gris)}
+.b-chiffre.rouge b{color:var(--rouge)}.b-chiffre.vert b{color:var(--vert)}
+.b-defile{overflow-x:auto}
+.b-sec{margin:18px 0 6px;font-size:1.02rem}
+.b-note{font-size:.85rem;color:var(--gris);margin:0 0 8px}
+.b-rouge{color:var(--rouge);font-weight:600}
+td.pt,th.pt{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.b-total td{border-top:2px solid var(--bord);font-weight:600}
+</style>
+{% set B = b %}
+{% set P = (B.apercu or B.resultats or B.bulletin or B.anomalies) %}
+{% macro filtre(avec_classe=true, classe_obligatoire=false, avec_anomalies=false) %}
+<form method="get" class="b-filtre" aria-label="Filtrer les bulletins">
+  <input type="hidden" name="f" value="bulletins"><input type="hidden" name="vue" value="{{ B.vue }}">
+  <div><label for="b-annee">Année scolaire</label>
+    <select id="b-annee" name="annee">{% for a in B.annees %}<option value="{{ a }}" {{ 'selected' if a == B.annee else '' }}>{{ a }}</option>{% endfor %}</select></div>
+  {% if avec_classe %}
+  <div><label for="b-classe">Classe</label>
+    <select id="b-classe" name="classe" {{ 'required' if classe_obligatoire else '' }}><option value="">{{ 'Choisir une classe' if classe_obligatoire else 'Toutes les classes' }}</option>
+      {% for k in B.classes %}<option value="{{ k.n_classe }}" {{ 'selected' if k.n_classe|string == B.classe else '' }}>{{ k.designation }}{% if k.option %} · {{ k.option }}{% endif %}</option>{% endfor %}</select></div>
+  {% endif %}
+  {% if P and P.portees %}
+  <div><label for="b-cle">Période, examen, semestre ou année</label>
+    <select id="b-cle" name="cle">{% if B.vue == 'anomalies' %}<option value="">Toutes</option>{% endif %}
+      {% for p in P.portees %}<option value="{{ p.cle }}" {{ 'selected' if p.cle == B.cle else '' }}>{{ p.libelle }}</option>{% endfor %}</select></div>
+  {% endif %}
+  {% if avec_anomalies %}
+  <div><label for="b-grav">Gravité</label>
+    <select id="b-grav" name="gravite"><option value="">Toutes</option><option value="ERREUR" {{ 'selected' if B.gravite == 'ERREUR' else '' }}>Erreurs</option><option value="ALERTE" {{ 'selected' if B.gravite == 'ALERTE' else '' }}>À vérifier</option></select></div>
+  <div><label for="b-code">Type</label>
+    <select id="b-code" name="code"><option value="">Tous</option>{% for code, lib in B.anomalies.types.items() %}<option value="{{ code }}" {{ 'selected' if B.code == code else '' }}>{{ lib }}</option>{% endfor %}</select></div>
+  {% endif %}
+  <div><label style="display:flex;gap:6px;align-items:center;margin-top:18px"><input type="checkbox" name="en_cours" value="1" {{ 'checked' if B.en_cours else '' }} style="width:auto;min-width:0"> Inclure les périodes en cours</label></div>
+  <div><button type="submit">Afficher</button></div>
+</form>
+{% endmacro %}
+
+{% macro statut(code, lib) %}<span class="b-pastille st-{{ code }}">{{ lib }}</span>{% endmacro %}
+
+{% macro liste_anomalies(liste, avec_classe=false) %}
+<div class="carte b-defile" style="padding:4px 8px;margin:0 0 10px">
+  <table class="tableau">
+    <thead><tr><th>Gravité</th>{% if avec_classe %}<th>Classe</th>{% endif %}<th>Type</th><th>Période</th><th>Cours</th><th>Détail</th></tr></thead>
+    <tbody>
+    {% for a in liste %}
+      <tr><td><span class="b-pastille g-{{ a.gravite }}">{{ a.gravite_libelle }}</span></td>{% if avec_classe %}<td>{{ a.classe }}</td>{% endif %}
+        <td>{{ a.type_libelle }}</td><td>{{ a.periode or '—' }}</td><td>{{ a.cours or '—' }}</td><td>{{ a.detail }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endmacro %}
+
+{% if B.erreur %}<div class="erreur">{{ B.erreur }}</div>{% endif %}
+
+<nav class="b-pills" aria-label="Vues de la gestion des bulletins">
+  {% for cle, lib in B.vues %}<a href="{{ url_for('etudes_sous_menu', sous='direction_etudes', f='bulletins', vue=cle, annee=B.annee or none) }}" class="{{ 'actif' if cle == B.vue else '' }}" {% if cle == B.vue %}aria-current="page"{% endif %}>{{ lib }}</a>{% endfor %}
+</nav>
+
+{# ============================================================ bulletin d'un élève #}
+{% if B.bulletin %}
+{% set L = B.bulletin %}
+<p style="margin:0 0 6px"><a class="lien" href="{{ url_for('etudes_sous_menu', sous='direction_etudes', f='bulletins', vue='classe', annee=L.annee, classe=L.classe.n_classe, cle=L.cle, en_cours='1' if B.en_cours else none) }}">&larr; Résultats de {{ L.classe.designation }}</a></p>
+<h3 class="b-sec" style="margin-top:4px">{{ L.eleve.nom }} <span class="sous" style="font-size:.85rem;font-weight:normal">· {{ L.eleve.matricule }} · {{ L.classe.designation }} · {{ L.annee }}</span></h3>
+<div style="display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px">
+  <a class="bouton second" target="_blank" rel="noopener" href="{{ url_for('etudes_bulletins_pdf', annee=L.annee, classe=L.classe.n_classe, cle=L.cle, eleve=L.eleve.matricule) }}">Bulletin PDF</a>
+</div>
+{% if L.problemes %}
+<h4 class="b-sec" style="margin-top:0">À vérifier pour cet élève ({{ L.problemes|length }})</h4>
+{{ liste_anomalies(L.problemes) }}
+{% else %}<p class="b-note"><span class="b-pastille g-OK">Aucun problème relevé</span> pour cet élève sur la portée affichée.</p>{% endif %}
+<div class="carte b-defile" style="padding:4px 8px">
+  <table class="tableau">
+    <thead><tr><th>Cours</th>{% for col in L.colonnes %}<th class="pt">{{ col.libelle if col.type != 'periode' else col.semestre ~ ' · ' ~ col.libelle }}</th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for l in L.lignes %}
+      <tr><td>{{ l.cours }}{% if l.professeur %}<div class="sous" style="font-size:.76rem">{{ l.professeur }}</div>{% endif %}</td>
+      {% for col in L.colonnes %}{% set v = l.cases[col.cle] %}<td class="pt">{% if v %}{{ v.obtenu }} / {{ v.max }}{% if v.pct is not none %} <span class="sous">({{ v.pct|string|replace('.', ',') }} %)</span>{% endif %}{% else %}<span class="b-rouge">—</span>{% endif %}</td>{% endfor %}</tr>
+    {% endfor %}
+      <tr class="b-total"><td>Total</td>{% for col in L.colonnes %}{% set v = L.totaux[col.cle] %}<td class="pt">{% if v.obtenu is not none %}{{ v.obtenu }} / {{ v.max }}{% else %}—{% endif %}</td>{% endfor %}</tr>
+      <tr><td>Pourcentage (moyenne)</td>{% for col in L.colonnes %}{% set v = L.totaux[col.cle] %}<td class="pt">{{ (v.pct|string|replace('.', ',') ~ ' %') if v.pct is not none else '—' }}</td>{% endfor %}</tr>
+      <tr><td>Rang (sur {{ L.effectif }})</td>{% for col in L.colonnes %}{% set v = L.totaux[col.cle] %}<td class="pt">{{ v.rang or '—' }}</td>{% endfor %}</tr>
+      <tr><td>Résultat et mention</td>{% for col in L.colonnes %}{% set v = L.totaux[col.cle] %}<td class="pt">{{ v.resultat or '—' }}{% if v.mention %}<div class="sous" style="font-size:.76rem">{{ v.mention }}</div>{% endif %}</td>{% endfor %}</tr>
+      <tr><td>Conduite</td>{% for col in L.colonnes %}{% set v = L.totaux[col.cle] %}<td class="pt">{{ v.conduite or '—' }}</td>{% endfor %}</tr>
+    </tbody>
+  </table>
+</div>
+<p class="b-note" style="margin-top:8px">Seuil de réussite : {{ '%.0f' % L.seuil }} %. La direction ne modifie jamais un point : une correction se demande au professeur (Contrôle des notes).</p>
+
+{# ============================================================ résultats d'une classe #}
+{% elif B.resultats %}
+{% set R = B.resultats %}
+{{ filtre(true, true) }}
+<h3 class="b-sec" style="margin-top:4px">{{ R.classe.designation }}{% if R.classe.option %} · {{ R.classe.option }}{% endif %} <span class="sous" style="font-size:.85rem;font-weight:normal">· {{ R.portee }} · {{ R.classe.effectif }} élève(s) · titulaire : {{ R.classe.titulaire or 'non désigné' }}</span></h3>
+<div class="b-chiffres">
+  <div class="b-chiffre"><b>{{ (R.stats.moyenne|string|replace('.', ',') ~ ' %') if R.stats.moyenne is not none else '—' }}</b><span>Moyenne de la classe</span></div>
+  <div class="b-chiffre"><b>{{ (R.stats.taux|string|replace('.', ',') ~ ' %') if R.stats.taux is not none else '—' }}</b><span>Taux de réussite ({{ R.stats.reussis or 0 }} réussi(s), {{ R.stats.echecs or 0 }} échec(s))</span></div>
+  <div class="b-chiffre"><b>{{ R.stats.en_attente or 0 }}</b><span>Résultat(s) en attente</span></div>
+  <div class="b-chiffre {{ 'rouge' if R.erreurs else 'vert' }}"><b>{{ R.erreurs }}</b><span>Erreur(s)</span></div>
+  <div class="b-chiffre {{ 'rouge' if R.alertes else '' }}"><b>{{ R.alertes }}</b><span>À vérifier</span></div>
+</div>
+<p style="margin:0 0 10px">Statut : {{ statut(R.statut, {'BLOQUE':'Bloqué','A_VERIFIER':'À vérifier','PRET':'Prêt','SANS_OBJET':'Sans objet'}[R.statut]) }}
+  &nbsp;<a class="bouton second" target="_blank" rel="noopener" href="{{ url_for('etudes_bulletins_pdf', annee=R.annee, classe=R.classe.n_classe, cle=R.cle) }}">Tous les bulletins en PDF</a></p>
+<div class="carte b-defile" style="padding:4px 8px;margin:0 0 12px">
+  <table class="tableau">
+    <thead><tr><th class="pt">Rang</th><th>Élève</th><th class="pt">Points</th><th class="pt">Moyenne</th><th>Mention</th><th>Résultat</th><th>Conduite</th><th class="pt">Problèmes</th><th></th></tr></thead>
+    <tbody>
+    {% for e in R.eleves %}
+      <tr><td class="pt">{{ e.rang or '—' }}</td><td>{{ e.nom }}</td>
+        <td class="pt">{% if e.obtenu is not none %}{{ e.obtenu }} / {{ e.max }}{% else %}—{% endif %}</td>
+        <td class="pt">{{ (e.pct|string|replace('.', ',') ~ ' %') if e.pct is not none else '—' }}</td>
+        <td>{{ e.mention or '—' }}</td><td>{{ e.resultat }}{% if not e.complet %} <span class="b-rouge" style="font-size:.78rem">incomplet</span>{% endif %}</td><td>{{ e.conduite or '—' }}</td>
+        <td class="pt">{% if e.problemes %}<span class="b-rouge">{{ e.problemes }}</span>{% else %}0{% endif %}</td>
+        <td><a class="lien" href="{{ url_for('etudes_sous_menu', sous='direction_etudes', f='bulletins', vue='classe', annee=R.annee, classe=R.classe.n_classe, cle=R.cle, eleve=e.matricule, en_cours='1' if R.en_cours else none) }}">Bulletin</a></td></tr>
+    {% else %}<tr><td colspan="9" class="sous">Aucun élève inscrit dans cette classe.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+<h4 class="b-sec">Moyenne par cours</h4>
+<div class="carte b-defile" style="padding:4px 8px;margin:0 0 12px">
+  <table class="tableau"><thead><tr><th>Cours</th><th>Professeur</th><th class="pt">Notes</th><th class="pt">Moyenne</th></tr></thead>
+    <tbody>{% for c in R.cours %}<tr><td>{{ c.cours }}</td><td>{{ c.professeur or '—' }}</td><td class="pt">{{ c.notes }} / {{ R.classe.effectif }}</td><td class="pt">{{ (c.moyenne|string|replace('.', ',') ~ ' %') if c.moyenne is not none else '—' }}</td></tr>{% endfor %}</tbody></table>
+</div>
+<h4 class="b-sec">Erreurs et données manquantes de la classe</h4>
+{% if R.anomalies %}{{ liste_anomalies(R.anomalies) }}{% else %}<p class="b-note"><span class="b-pastille g-OK">Rien à signaler</span> pour cette portée.</p>{% endif %}
+
+{% elif B.vue == 'classe' %}
+{{ filtre(true, true) }}
+<div class="carte"><p class="sous" style="margin:0">Choisissez une classe pour consulter ses résultats et ses bulletins.</p></div>
+
+{# ============================================================ erreurs et données manquantes #}
+{% elif B.anomalies %}
+{% set A = B.anomalies %}
+{{ filtre(true, false, true) }}
+<div class="b-chiffres">
+  <div class="b-chiffre {{ 'rouge' if A.nb.ERREUR else 'vert' }}"><b>{{ A.nb.ERREUR }}</b><span>Erreur(s)</span></div>
+  <div class="b-chiffre {{ 'rouge' if A.nb.ALERTE else 'vert' }}"><b>{{ A.nb.ALERTE }}</b><span>À vérifier</span></div>
+</div>
+{% if A.par_type %}<p class="b-note">{% for code, lib, n in A.par_type %}{{ lib }} : <b>{{ n }}</b>{{ ' · ' if not loop.last else '' }}{% endfor %}</p>{% endif %}
+{% if A.anomalies %}
+<p style="margin:0 0 10px"><a class="bouton second" href="{{ url_for('etudes_bulletins_csv', annee=A.annee, classe=A.n_classe or none, cle=A.cle or none, gravite=A.gravite or none, code=A.code or none, en_cours='1' if A.en_cours else none) }}">Exporter en CSV</a></p>
+{{ liste_anomalies(A.anomalies, true) }}
+{% else %}<div class="carte"><p class="sous" style="margin:0">{{ 'Aucune erreur ni donnée manquante pour ces critères.' if not A.total else 'Aucune ligne ne correspond à ces filtres.' }}</p></div>{% endif %}
+<p class="b-note">« Erreur » : bulletin faux ou impossible à établir. « À vérifier » : à régler avant de publier. Une donnée manque seulement pour une période échue (ou en cours si la case est cochée).</p>
+
+{# ============================================================ vue d'ensemble #}
+{% elif B.apercu %}
+{% set O = B.apercu %}
+{{ filtre(false) }}
+<div class="b-chiffres">
+  <div class="b-chiffre"><b>{{ O.total.classes }}</b><span>Classe(s)</span></div>
+  <div class="b-chiffre {{ 'vert' if O.total.pretes == O.total.classes and O.total.classes else '' }}"><b>{{ O.total.pretes }}</b><span>Prête(s)</span></div>
+  <div class="b-chiffre"><b>{{ O.total.a_verifier }}</b><span>À vérifier</span></div>
+  <div class="b-chiffre {{ 'rouge' if O.total.bloquees else '' }}"><b>{{ O.total.bloquees }}</b><span>Bloquée(s)</span></div>
+  <div class="b-chiffre {{ 'rouge' if O.total.erreurs else 'vert' }}"><b>{{ O.total.erreurs }}</b><span>Erreur(s)</span></div>
+</div>
+<div class="carte b-defile" style="padding:4px 8px">
+  <table class="tableau">
+    <thead><tr><th>Classe</th><th>Titulaire</th><th class="pt">Élèves</th><th class="pt">Moyenne</th><th class="pt">Réussite</th><th class="pt">En attente</th><th class="pt">Erreurs</th><th class="pt">À vérifier</th><th>Statut</th></tr></thead>
+    <tbody>
+    {% for k in O.classes %}
+      <tr><td><a class="lien" href="{{ url_for('etudes_sous_menu', sous='direction_etudes', f='bulletins', vue='classe', annee=O.annee, classe=k.n_classe, cle=O.cle, en_cours='1' if O.en_cours else none) }}">{{ k.designation }}{% if k.option %} · {{ k.option }}{% endif %}</a></td>
+        <td>{{ k.titulaire or '—' }}</td><td class="pt">{{ k.effectif }}</td>
+        <td class="pt">{{ (k.moyenne|string|replace('.', ',') ~ ' %') if k.moyenne is not none else '—' }}</td>
+        <td class="pt">{{ (k.taux|string|replace('.', ',') ~ ' %') if k.taux is not none else '—' }}</td>
+        <td class="pt">{{ k.en_attente }}</td>
+        <td class="pt">{% if k.erreurs %}<span class="b-rouge">{{ k.erreurs }}</span>{% else %}0{% endif %}</td><td class="pt">{{ k.alertes }}</td>
+        <td>{{ statut(k.statut, k.statut_libelle) }}</td></tr>
+    {% else %}<tr><td colspan="9" class="sous">Aucun cours n'est ouvert dans les classes du secondaire pour {{ O.annee }}.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="b-note" style="margin-top:8px">Les bulletins sont calculés automatiquement à partir des points des professeurs. Statut : « Bloqué » = au moins une erreur ; « À vérifier » = alerte ou résultat en attente ; « Prêt » = rien à signaler.</p>
+
+{% elif B.vue == 'apercu' %}
+{{ filtre(false) }}
+{% endif %}

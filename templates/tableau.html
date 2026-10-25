@@ -1,0 +1,107 @@
+{% extends "accueil_base.html" %}
+{% block titre %}Tableau de bord{% endblock %}
+{% block corps %}
+<style>
+.tb-bandeau{background:linear-gradient(120deg,var(--nuit),#16306B);color:#fff;border-radius:16px;padding:20px 24px;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+.tb-bandeau h1{color:#fff;margin:0}.tb-bandeau p{margin:2px 0 0;color:#B7C7EE}
+.tb-bandeau form{display:flex;gap:8px;align-items:center;margin:0}.tb-bandeau label{margin:0;color:#B7C7EE}
+.tb-bandeau select{width:auto;background:#ffffff1f;color:#fff;border:1px solid #ffffff55;border-radius:99px;padding:8px 14px}
+.tb-bandeau select option{color:#16213E}
+.tb-haut{display:grid;grid-template-columns:minmax(260px,1fr) 2fr;gap:14px;margin-bottom:14px}
+.tb-jauge{display:flex;align-items:center;gap:20px;border-radius:16px}
+.tb-anneau{--p:0;width:130px;height:130px;flex:none;border-radius:50%;background:conic-gradient(var(--vert) calc(var(--p)*1%),var(--bord) 0);display:grid;place-items:center}
+.tb-anneau>div{width:96px;height:96px;border-radius:50%;background:var(--carte);display:flex;flex-direction:column;align-items:center;justify-content:center}
+.tb-anneau b{font-family:Georgia,serif;font-size:1.7rem;line-height:1}.tb-anneau small{color:var(--gris);font-size:.72rem}
+.tb-jauge h2{font-size:1rem;margin:0 0 4px}.tb-jauge p{margin:0;color:var(--gris);font-size:.85rem}
+.tb-chiffres{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.tb-chiffre{border-radius:16px;display:flex;flex-direction:column;gap:6px;padding:16px 18px}
+.tb-chiffre .lib{font-size:.8rem;font-weight:600;color:var(--gris);display:flex;align-items:center;gap:8px}
+.tb-chiffre .lib::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--c)}
+.tb-chiffre .nb{font-family:Georgia,serif;font-size:2rem;font-weight:bold;line-height:1.1}
+.tb-chiffre .note{font-size:.8rem;color:var(--gris)}
+.tb-barre{height:8px;border-radius:99px;background:var(--bord);overflow:hidden}.tb-barre i{display:block;height:100%;width:var(--w);background:var(--c);border-radius:99px}
+.tb-graphs{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px}
+.tb-graphs .carte{border-radius:16px}.tb-graphs .large{grid-column:span 3}
+@media(max-width:1100px){.tb-haut{grid-template-columns:1fr}.tb-graphs{grid-template-columns:repeat(2,1fr)}.tb-graphs .large{grid-column:span 2}}
+@media(max-width:600px){.tb-chiffres,.tb-graphs{grid-template-columns:1fr}.tb-graphs .large{grid-column:auto}.tb-jauge{flex-direction:column;text-align:center}}
+.tb-graphs h2{font-size:1rem;margin:0 0 8px}
+.graph{width:100%;height:auto;display:block;max-height:280px}
+.graph .t{font:12px "Segoe UI",system-ui,sans-serif;fill:var(--texte)}
+.graph .pale{fill:var(--gris)}.graph .fort{font-weight:700}.graph .gros{font-size:28px;font-weight:700;font-family:Georgia,serif}
+.graph .grille{stroke:var(--bord);stroke-width:1}
+.graph .part{stroke:var(--carte);stroke-width:2}
+.tb-sections{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:14px}
+.tb-sections .carte{border-radius:16px}.tb-sections h2{font-size:1rem;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+.tb-sections h2::before{content:"";width:6px;height:18px;border-radius:3px;background:var(--bleu)}
+.tb-lignes{display:grid;gap:12px}
+.tb-ligne .tete{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:.9rem}
+.tb-ligne .tete b{font-size:1.05rem}.tb-ligne .detail{font-size:.8rem;color:var(--gris);margin-top:4px;display:flex;gap:14px;flex-wrap:wrap}
+@media(max-width:900px){.tb-sections{grid-template-columns:1fr}}
+.tb-rapides .tuile{border-radius:12px;border-left-width:1px;border-top:4px solid var(--bleu);padding:10px 12px}
+</style>
+<div class="tb-bandeau">
+  <div><h1>Tableau de bord</h1>
+  <p>Bienvenue, {{ s.nom_complet }} · vue générale de l'établissement</p></div>
+  <form method="get" action="/tableau-de-bord">
+    <label for="annee"><b>Année scolaire</b></label>
+    <select id="annee" name="annee" onchange="this.form.submit()">
+      {% for a in d.annees %}<option value="{{ a }}" {% if a == d.annee %}selected{% endif %}>{{ a }}</option>{% endfor %}
+    </select>
+    <noscript><button type="submit">Afficher</button></noscript>
+  </form>
+</div>
+{% if erreur %}<div class="erreur">{{ erreur }}</div>{% endif %}
+
+<div class="tb-haut">
+  <div class="carte tb-jauge">
+    <div class="tb-anneau" style="--p:{{ e.taux_en_regle }}"><div><b>{{ e.taux_en_regle }} %</b><small>en règle</small></div></div>
+    <div><h2>Situation générale</h2><p>{% if d.annee %}Année {{ d.annee }}{% else %}Aucune année scolaire{% endif %}</p></div>
+  </div>
+  <div class="tb-chiffres">
+    <div class="carte tb-chiffre" style="--c:#1D4ED8"><span class="lib">Élèves</span><span class="nb">{{ e.inscrits }}</span>
+      <span class="note">{% if d.annee %}Année {{ d.annee }}{% else %}Aucune année scolaire{% endif %}</span></div>
+    <div class="carte tb-chiffre" style="--c:#16A34A"><span class="lib">Élèves en règle</span><span class="nb">{{ e.en_regle }}</span>
+      <div class="tb-barre"><i style="--w:{{ e.taux_en_regle }}%"></i></div>
+      <span class="note">{% if e.inscrits %}{{ e.taux_en_regle }} % des élèves{% endif %}</span></div>
+    <div class="carte tb-chiffre" style="--c:#D97706"><span class="lib">Élèves pas en règle</span><span class="nb">{{ e.pas_en_regle }}</span>
+      <div class="tb-barre"><i style="--w:{{ 100 - e.taux_en_regle if e.inscrits else 0 }}%"></i></div>
+      <span class="note">{% if e.inscrits %}{{ 100 - e.taux_en_regle }} % des élèves{% endif %}</span></div>
+    <div class="carte tb-chiffre" style="--c:#87CEEB"><span class="lib">Personnel actif</span><span class="nb">{{ personnel }}</span>
+      <span class="note">Agents en fonction</span></div>
+  </div>
+</div>
+
+<div class="tb-sections">
+  <div class="carte"><h2>Situation financière générale</h2>
+    {% if syn.finances %}<div class="tb-lignes">
+      {% for f in syn.finances %}<div class="tb-ligne" style="--c:#16A34A">
+        <div class="tete"><span>Frais payés ({{ f.devise }})</span><b>{{ montant(f.paye) }} / {{ montant(f.du) }} {{ f.devise }}</b></div>
+        <div class="tb-barre" style="margin-top:6px"><i style="--w:{{ f.taux }}%"></i></div>
+        <div class="detail"><span>{{ f.taux }} % recouvré</span><span>Reste à payer : {{ montant(f.reste) }} {{ f.devise }}</span></div>
+      </div>{% endfor %}
+    </div>{% else %}<p class="sous">Aucun frais dû pour cette année scolaire.</p>{% endif %}
+  </div>
+
+  <div class="carte"><h2>Frais du logiciel des parents</h2>
+    {% if syn.logiciel.configure %}
+    <div class="tb-ligne" style="--c:#1D4ED8">
+      <div class="tete"><span>Élèves dont le frais est payé</span><b>{{ syn.logiciel.taux }} %</b></div>
+      <div class="tb-barre" style="margin-top:6px"><i style="--w:{{ syn.logiciel.taux }}%"></i></div>
+      <div class="detail"><span>{{ syn.logiciel.payes }} sur {{ syn.logiciel.inscrits }} élèves</span><span>Codes d'accès déjà utilisés : {{ syn.logiciel.codes_utilises }}</span></div>
+    </div>
+    {% else %}<p class="sous">Aucun type de frais n'est marqué « Frais du logiciel des parents » (Travaux techniques &gt; Mise à jour des tables &gt; Types de frais).</p>{% endif %}
+  </div>
+</div>
+
+<div class="tb-graphs">
+  <div class="carte large"><h2>Évolution du nombre d'élèves</h2>{{ courbe }}</div>
+  <div class="carte"><h2>Situation des élèves</h2>{{ camembert }}</div>
+</div>
+
+<div class="carte tb-rapides-boite"><h2 style="font-size:1rem;margin:0 0 10px">Accès rapides</h2>
+  {% if rapides %}<div class="tb-rapides" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
+    {% for cle, titre, sous in rapides %}<a class="tuile" href="/m/{{ cle }}"><b>{{ titre }}</b><span>{{ sous }}</span></a>{% endfor %}
+  </div>{% else %}<p class="sous">Aucun module ouvert à votre compte.</p>{% endif %}
+</div>
+
+{% endblock %}

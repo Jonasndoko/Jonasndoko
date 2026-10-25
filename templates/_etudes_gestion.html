@@ -1,0 +1,4 @@
+{# Direction des études : cours et enseignants (cours.py), présence des élèves de toutes les classes (presence_eleves.py). #}
+{% include "_etudes_gestion_style.html" %}
+{% if erreur %}<div class="erreur" role="alert">{{ erreur }}</div>{% endif %}
+{% if fonction == 'calendrier' %}{% include "_etudes_gestion_calendrier.html" %}{% elif fonction == 'cours' %}{% include "_etudes_gestion_cours.html" %}{% elif fonction == 'programme' %}{% include "_etudes_gestion_programme.html" %}{% elif fonction == 'enseignants' %}{% include "_etudes_gestion_enseignants.html" %}{% elif fonction == 'presence_eleves' %}{% include "_presence_eleves_corps.html" %}{% endif %}

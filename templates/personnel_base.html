@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block titre %}Gestion du personnel{% endblock %}
+{% block entete %}
+{% if menu_utile %}<a class="bouton clair" href="/">Menu</a>{% endif %}
+<span style="font-size:.85rem">{{ s.nom_complet }} · {{ s.libelle_role }}</span>
+<form method="post" action="/deconnexion"><button class="clair" type="submit">Déconnexion</button></form>
+{% endblock %}
+{% block corps %}
+<style>
+.fonct{display:flex;flex-wrap:wrap;gap:0;margin:0 0 0;border-radius:8px 8px 0 0;overflow:hidden}
+.fonct a{flex:1 1 200px;text-align:center;padding:11px 12px;background:var(--nuit);color:#B7C7EE;text-decoration:none;font-weight:700;font-size:.95rem}
+.fonct a.actif{background:var(--bleu);color:#fff}
+.grille-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:0 18px}
+.grille-form .large{grid-column:1/-1}
+.badge.inactif{background:#ECEEF3;color:#5A6785}
+.badge.encours{background:#DDF3E3;color:#1E6B30}.badge.avenir{background:#E3ECFD;color:#1D4ED8}
+.badge.present{background:#DDF3E3;color:#1E6B30}.badge.retard{background:#FDF0DC;color:#8A5300}.badge.absent{background:#FDECEA;color:#B3261E}
+.badge.permission,.badge.conge{background:#E3ECFD;color:#1D4ED8}.badge.nonrenseigne{background:#ECEEF3;color:#5A6785}
+button.danger,.bouton.danger{background:var(--rouge)}
+button.petit{padding:6px 12px;font-size:.85rem}
+.obligatoire::after{content:" *";color:var(--rouge)}
+details.corriger{margin:0}details.corriger summary{cursor:pointer;color:var(--bleu);font-size:.88rem}
+details.corriger .carte{margin-top:8px}
+.tableau td form{display:inline-flex}
+.tableau td .grille-form{min-width:560px}
+.tableau input,.tableau select{width:auto}
+.tableau td input[type=text],.tableau td input[type=date]{width:100%}
+.resume{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.alerte ul{margin:6px 0 0 18px;padding:0}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .badge.inactif,:root:not([data-theme=light]) .badge.nonrenseigne{background:#222E4F;color:#B7C7EE}:root:not([data-theme=light]) .badge.encours,:root:not([data-theme=light]) .badge.present{background:#12301B;color:#9BE3B0}:root:not([data-theme=light]) .badge.avenir,:root:not([data-theme=light]) .badge.permission,:root:not([data-theme=light]) .badge.conge{background:#16264F;color:#A9C2FF}:root:not([data-theme=light]) .badge.retard{background:#3A2A0E;color:#FFD9A0}:root:not([data-theme=light]) .badge.absent{background:#3A1614;color:#FFB4AB}}
+</style>
+<h1>Gestion du personnel</h1>
+<nav class="fonct" aria-label="Fonctionnalités du module">
+  {% for f in fonct %}<a href="{{ f.lien }}" class="{{ 'actif' if f.actif else '' }}">{{ f.libelle }}</a>{% endfor %}
+</nav>
+<nav class="onglets" style="background:var(--carte);padding:6px 6px 0;border:1px solid var(--bord);border-top:0;border-radius:0 0 8px 8px;margin-top:0" aria-label="Onglets">
+  {% for f in fonct if f.actif %}{% for o in f.onglets %}
+    {% if o.verrou %}<span class="verrou" title="Droit « Ajout » requis">{{ o.libelle }} (réservé)</span>
+    {% else %}<a href="{{ o.lien }}" class="{{ 'actif' if o.actif else '' }}">{{ o.libelle }}</a>{% endif %}
+  {% endfor %}{% endfor %}
+</nav>
+<div style="height:14px"></div>
+{% if ok %}<div class="succes" role="status">{{ ok }}</div>{% endif %}
+{% if erreur %}<div class="erreur" role="alert">{{ erreur }}</div>{% endif %}
+{% for i in info or [] %}<div class="alerte" role="status">{{ i }}</div>{% endfor %}
+{% block contenu %}{% endblock %}
+{% endblock %}

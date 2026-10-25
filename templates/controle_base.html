@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block titre %}Contrôle numérique{% endblock %}
+{% block entete %}
+{% if menu_utile %}<a class="bouton clair" href="/">Menu</a>{% endif %}
+<span style="font-size:.85rem">{{ s.nom_complet }} · {{ s.libelle_role }}</span>
+<form method="post" action="/deconnexion"><button class="clair" type="submit">Déconnexion</button></form>
+{% endblock %}
+{% block corps %}
+<h1>Contrôle numérique</h1>
+<nav class="onglets" aria-label="Onglets du module">
+  {% for cle, libelle, lien in onglets %}<a href="{{ lien }}" class="{{ 'actif' if cle == onglet else '' }}">{{ libelle }}</a>{% endfor %}
+</nav>
+{% block contenu %}{% endblock %}
+{% endblock %}

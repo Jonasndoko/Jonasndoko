@@ -1,0 +1,35 @@
+{% extends "controle_base.html" %}
+{% block contenu %}
+<div class="carte form" style="max-width:640px">
+  <h2 style="margin-top:0">Application mobile de contrôle</h2>
+  <p class="sous">Le contrôleur ouvre l'application sur son téléphone, se connecte avec son identifiant et son mot de passe, choisit le type de frais (ou tous les frais), puis contrôle chaque élève en scannant sa carte ou en tapant son matricule.</p>
+  {% if message %}<div class="succes espace" role="status">{{ message }}</div>{% endif %}
+  <p style="font-size:1.1rem;margin:12px 0">État :
+    {% if etat.actif %}<span class="badge solde">ACTIVÉE</span>{% else %}<span class="badge impaye">COUPÉE</span>{% endif %}
+    {% if etat.par %}<span class="sous"> — dernier changement par {{ etat.par }}, le {{ etat.le }}</span>{% endif %}</p>
+  <form method="post" action="/m/controle/mobile" onsubmit="this.querySelector('button[type=submit]').disabled=true">
+    {% if etat.actif %}
+      <input type="hidden" name="action" value="couper">
+      <button type="submit">Couper l'application mobile</button>
+      <p class="sous" style="margin-top:8px">Couper l'application refuse aussitôt tous les téléphones connectés et empêche toute nouvelle connexion.</p>
+    {% else %}
+      <input type="hidden" name="action" value="activer">
+      <button type="submit">Activer l'application mobile</button>
+      <p class="sous" style="margin-top:8px">Seuls les comptes qui ont le droit « Lecture » sur le module Contrôle numérique pourront s'y connecter.</p>
+    {% endif %}
+  </form>
+</div>
+<div class="carte espace" style="max-width:640px">
+  <h3 style="margin-top:0">Adresse de l'application</h3>
+  <p><a class="lien" href="{{ lien }}">{{ lien }}</a></p>
+  {% if svg %}<div style="width:180px;max-width:100%">{{ svg|safe }}</div>
+  <p class="sous">Scannez ce code avec le téléphone du contrôleur pour ouvrir l'application.</p>{% endif %}
+  <p style="margin:10px 0 4px"><b>Installer sur le téléphone</b></p>
+  <ol class="sous" style="margin:0;padding-left:20px">
+    <li>Android (Chrome) : à l'ouverture, touchez le bouton « Installer sur ce téléphone » (ou menu ⋮ &gt; « Installer l'application »).</li>
+    <li>iPhone (Safari) : bouton Partager &gt; « Sur l'écran d'accueil » &gt; « Ajouter ».</li>
+    <li>L'icône « Contrôle » apparaît alors sur l'écran d'accueil et s'ouvre en plein écran.</li>
+  </ol>
+  <p class="sous">La caméra du téléphone ne fonctionne qu'en HTTPS (adresse commençant par https://). Sans caméra, le contrôleur peut toujours taper le matricule.</p>
+</div>
+{% endblock %}

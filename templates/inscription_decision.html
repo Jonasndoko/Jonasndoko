@@ -1,0 +1,46 @@
+{% extends "inscription_base.html" %}
+{% block contenu %}
+{% if succes %}<div class="succes" role="status">{{ succes }}</div>{% endif %}
+{% if erreur %}<div class="erreur" role="alert">{{ erreur }}</div>{% endif %}
+<div class="carte">
+  <h2 style="margin:0 0 8px;font-size:1.15rem">{{ c.nom_complet }} <small class="sous">({{ c.num_cand }})</small></h2>
+  <dl class="infos">
+    <div><dt>Étape</dt><dd>{{ c.libelle_etape }}</dd></div>
+    <div><dt>Classe souhaitée</dt><dd>{{ c.classe }}</dd></div>
+    <div><dt>Ancienne école</dt><dd>{{ c.ecole_origine }} ({{ c.pourcent_origine }} %)</dd></div>
+    <div><dt>Doublant</dt><dd>{{ 'Oui' if c.doublant else 'Non' }}</dd></div>
+    <div><dt>Reçu des frais</dt><dd>{{ c.n_recu }}</dd></div>
+    <div><dt>Tuteur</dt><dd>{{ c.nom_tuteur }} · {{ c.tel_tuteur }}</dd></div>
+    {% if c.note_test %}<div><dt>Note du test</dt><dd>{{ c.note_test }} / 100</dd></div>{% endif %}
+    {% if c.matricule %}<div><dt>Matricule</dt><dd>{{ c.matricule }}</dd></div>{% endif %}
+    {% if c.classe_affectee %}<div><dt>Classe d'affectation</dt><dd>{{ c.classe_affectee }}</dd></div>{% endif %}
+  </dl>
+</div>
+
+{% if c.etape == 'A_TESTER' %}
+<form class="carte espace" method="post" action="{{ url_for('inscription_test_confirmer', n_cand=c.n_cand) }}">
+  <h2 style="margin:0 0 4px;font-size:1.1rem">1   Résultat du test d'admission</h2>
+  <label for="note">Note (sur 100)</label>
+  <input id="note" name="note" value="{{ note }}" inputmode="decimal" autocomplete="off" style="max-width:12rem">
+  <p class="sous" style="margin:8px 0 0;font-size:.85rem">Seuil de réussite : {{ '%g'|format(seuil) }} / 100. En dessous, la candidature est refusée.</p>
+  <div class="actions"><button type="submit">Continuer</button></div>
+</form>
+{% elif c.etape == 'A_AFFECTER' %}
+<form class="carte espace" method="post" action="{{ url_for('inscription_affecter_confirmer', n_cand=c.n_cand) }}">
+  <h2 style="margin:0 0 4px;font-size:1.1rem">2   Affectation à une classe</h2>
+  <label for="classe">Classe</label>
+  <select id="classe" name="classe">
+    <option value="">— Choisissez —</option>
+    {% for n, libelle in classes %}<option value="{{ n }}" {{ 'selected' if n == defaut_classe else '' }}>{{ libelle }}</option>{% endfor %}
+  </select>
+  <p class="sous" style="margin:8px 0 0;font-size:.85rem">Le candidat devient élève : matricule et code QR attribués, inscription dans la classe.</p>
+  <div class="actions"><button type="submit">Valider et affecter</button></div>
+</form>
+{% elif c.etape == 'ADMIS' %}
+<div class="carte espace"><p style="margin:0">Ce candidat est admis : élève <b>{{ c.matricule }}</b>.</p>
+  <div class="actions"><a class="bouton" target="_blank" rel="noopener" href="{{ url_for('inscription_avis_pdf', n_cand=c.n_cand) }}">Imprimer l'avis d'admission (PDF)</a></div></div>
+{% else %}
+<div class="alerte espace">Cette candidature est « {{ c.libelle_etape|lower }} » : aucune décision n'est plus possible.</div>
+{% endif %}
+<div class="actions"><a class="bouton second" href="{{ url_for('inscription_validation') }}">Retour à la liste</a></div>
+{% endblock %}

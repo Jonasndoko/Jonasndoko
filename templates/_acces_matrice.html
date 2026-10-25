@@ -1,0 +1,7 @@
+<div class="defile"><table class="tableau matrice">
+  <tr><th>Module</th>{% for c in matrice.colonnes %}<th>{{ c }}</th>{% endfor %}</tr>
+  {% for l in matrice.lignes %}<tr><td>{{ l.titre }}</td>
+    {% for c in l.cases %}<td><input type="checkbox" name="d" value="{{ c.valeur }}" {{ 'checked' if c.coche else '' }} {{ '' if c.possible else 'disabled' }} aria-label="{{ l.titre }} : {{ matrice.colonnes[loop.index0] }}"></td>{% endfor %}
+  </tr>{% endfor %}
+</table></div>
+<p class="note">« Lecture » est accordée d'office dès qu'un autre droit l'est et ouvre le module. Dans Paiement des frais, Ajout permet d'enregistrer un paiement (réservé en plus au rôle Percepteur) ; un reçu ne se modifie ni ne se supprime. « Travaux techniques » et « Gestionnaire d'accès » sont réservés au rôle Administrateur. « Tableau de bord », « Traçabilité et audit » et « Présence des élèves » : seule la Lecture existe ; l'Administrateur a toujours accès au tableau de bord et à l'audit.</p>

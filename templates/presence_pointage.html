@@ -1,0 +1,72 @@
+{% extends "personnel_base.html" %}
+{% block contenu %}
+<form class="carte" method="get" action="/m/personnel/pointage">
+  <div class="grille-form">
+    <div><label for="jour">Jour</label><input id="jour" type="date" name="jour" value="{{ jour }}" max="{{ aujourdhui }}"></div>
+    <div><label for="fonction">Fonction (facultatif)</label>
+      <select id="fonction" name="fonction"><option value="">Tout le personnel</option>
+        {% for f in fonctions %}<option value="{{ f.id }}" {{ 'selected' if fonction == f.id|string }}>{{ f.libelle }}</option>{% endfor %}</select></div>
+  </div>
+  <div class="actions"><button type="submit">Afficher la feuille</button></div>
+</form>
+
+{% if feuille %}
+<div class="carte espace">
+  <h2 style="margin:0 0 4px;font-size:1.05rem">Feuille de présence du {{ feuille.jour }}</h2>
+  {% if not feuille.travaille %}<div class="alerte espace" role="status">{{ feuille.raison }} : on ne pointe pas ce jour-là.</div>{% endif %}
+  <div class="resume" style="margin-top:8px">
+    {% for cle, lib in statuts_jour.items() %}{% if feuille.resume[cle] %}<span class="badge {{ cle|lower|replace('_','') }}">{{ lib }} : {{ feuille.resume[cle] }}</span>{% endif %}{% endfor %}
+  </div>
+  {% if feuille.travaille and d.ajout and feuille.resume.NON_RENSEIGNE %}
+  <form method="post" action="/m/personnel/pointage/tous-presents" onsubmit="return confirm('Marquer présents les {{ feuille.resume.NON_RENSEIGNE }} agent(s) non renseigné(s) ?')" style="margin:0 0 12px">
+    <input type="hidden" name="jour" value="{{ jour }}"><input type="hidden" name="fonction" value="{{ fonction }}">
+    <button type="submit" class="second">Marquer « présents » tous les non renseignés</button></form>
+  {% endif %}
+  {% if feuille.lignes %}
+  <p class="sous" style="font-size:.85rem;margin:0 0 6px">Heure d'ouverture : {{ heure_ouverture }}. Un agent en retard est présent : indiquez son heure d'arrivée.</p>
+  <div class="defile"><table class="tableau">
+    <tr><th>Agent</th><th>Situation</th><th>Pointage</th><th>Heure d'arrivée</th><th>Motif</th><th></th></tr>
+    {% for l in feuille.lignes %}{% set f = 'p' ~ loop.index %}
+    <tr>
+      <td>{{ l.nom_complet }}<br><span class="sous" style="margin:0;font-size:.78rem">{{ l.matricule }}{% if l.fonction %} · {{ l.fonction }}{% endif %}{% if not l.actif %} · désactivé{% endif %}</span></td>
+      <td><span class="badge {{ l.statut|lower|replace('_','') }}">{{ l.libelle }}</span>{% if l.minutes %}<br><span class="sous" style="margin:0;font-size:.78rem">{{ l.minutes }} min de retard</span>{% endif %}</td>
+      {% if l.verrouille %}
+        <td colspan="3" class="sous">{{ l.motif or l.libelle }} : on ne pointe pas cet agent ce jour-là.</td><td></td>
+      {% elif feuille.travaille and l.actif %}
+        <td><form id="{{ f }}" method="post" action="/m/personnel/pointage/enregistrer" style="display:none"><input type="hidden" name="m" value="{{ l.matricule }}"><input type="hidden" name="jour" value="{{ jour }}"><input type="hidden" name="fonction" value="{{ fonction }}"></form>
+          <select form="{{ f }}" name="statut" aria-label="Pointage de {{ l.nom_complet }}">{% for cle, lib in statuts.items() %}<option value="{{ cle }}" {{ 'selected' if l.statut == cle }}>{{ lib }}</option>{% endfor %}</select></td>
+        <td><input form="{{ f }}" type="time" name="heure" value="{{ l.heure }}" aria-label="Heure d'arrivée" style="width:8rem"></td>
+        <td><input form="{{ f }}" type="text" name="motif" value="{{ l.motif }}" maxlength="200" aria-label="Motif" style="min-width:10rem"></td>
+        <td style="white-space:nowrap"><button form="{{ f }}" type="submit" class="petit">Enregistrer</button>
+          {% if d.suppr and l.statut in statuts %}<button form="{{ f }}" type="submit" formaction="/m/personnel/pointage/effacer" class="danger petit" onclick="return confirm('Effacer ce pointage ?')">Effacer</button>{% endif %}</td>
+      {% else %}
+        <td colspan="3" class="sous">{{ l.motif }}</td><td></td>
+      {% endif %}
+    </tr>{% endfor %}
+  </table></div>
+  {% else %}<p class="sous" style="margin:0">Aucun agent à pointer ce jour-là.</p>{% endif %}
+</div>
+{% endif %}
+
+<div class="carte espace">
+  <h2 style="margin:0 0 6px;font-size:1.05rem">Jours non travaillés (fêtes, vacances)</h2>
+  <p class="sous" style="font-size:.88rem">Du lundi au vendredi, un jour est travaillé sauf s'il figure ici. Le week-end n'a pas besoin d'y être.</p>
+  <form method="get" action="/m/personnel/pointage" class="ligne" style="margin-bottom:10px">
+    <input type="hidden" name="jour" value="{{ jour }}"><input type="hidden" name="fonction" value="{{ fonction }}">
+    <label for="annee" style="margin:0">Année</label><input id="annee" name="annee" value="{{ annee }}" inputmode="numeric" maxlength="4" style="max-width:7rem"><button type="submit" class="second petit">Afficher</button>
+  </form>
+  {% if fermes %}
+  <div class="defile"><table class="tableau"><tr><th>Date</th><th>Raison</th><th></th></tr>
+    {% for j in fermes %}<tr><td>{{ j.date }}</td><td>{{ j.libelle }}</td>
+      <td>{% if d.suppr %}<form method="post" action="/m/personnel/pointage/jour-non-travaille/retirer" onsubmit="return confirm('Retirer ce jour de la liste ?')"><input type="hidden" name="date_ferme" value="{{ j.iso }}"><input type="hidden" name="jour" value="{{ jour }}"><input type="hidden" name="fonction" value="{{ fonction }}"><button class="danger petit" type="submit">Retirer</button></form>{% endif %}</td></tr>{% endfor %}
+  </table></div>
+  {% else %}<p class="sous" style="margin:0">Aucun jour non travaillé enregistré en {{ annee }}.</p>{% endif %}
+  {% if d.ajout %}
+  <form method="post" action="/m/personnel/pointage/jour-non-travaille" class="espace">
+    <input type="hidden" name="jour" value="{{ jour }}"><input type="hidden" name="fonction" value="{{ fonction }}">
+    <div class="grille-form"><div><label class="obligatoire">Date</label><input type="date" name="date_ferme" required></div>
+      <div><label class="obligatoire">Raison</label><input name="libelle" maxlength="80" required placeholder="ex. Fête de l'indépendance"></div></div>
+    <div class="actions" style="margin-top:10px"><button type="submit" class="second">Ajouter ce jour</button></div>
+  </form>{% endif %}
+</div>
+{% endblock %}

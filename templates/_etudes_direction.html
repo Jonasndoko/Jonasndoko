@@ -1,0 +1,36 @@
+<style>h3.sec{margin:20px 0 8px;font-size:1.05rem}</style>
+{% if module_propre %}{% include "_etudes_boutons.html" %}{% else %}<nav class="onglets" aria-label="Fonctionnalités de l'espace">
+  {% for cle, lib, desc in fonctions %}
+  <a href="{{ url_for('etudes_sous_menu', sous=sous, f=cle) }}" title="{{ desc }}" class="{{ 'actif' if cle == fonction else '' }}" {% if cle == fonction %}aria-current="page"{% endif %}>{{ loop.index }}. {{ lib }}</a>
+  {% endfor %}
+</nav>{% endif %}
+{% if fonction in ('calendrier', 'cours', 'programme', 'enseignants', 'presence_eleves') and sous == 'direction_etudes' %}{% include "_etudes_gestion.html" %}{% elif fonction == 'horaire' %}{% include "_etudes_horaire.html" %}{% elif fonction == 'heures' %}{% include "_etudes_heures.html" %}{% elif fonction == 'notes' %}{% include "_etudes_notes.html" %}{% elif fonction == 'bulletins' %}{% include "_etudes_bulletins.html" %}{% elif fonction == 'statistiques' %}{% include "_etudes_stats.html" %}{% elif fonction == 'presences' %}{% include "_etudes_presences.html" %}{% elif fonction == 'conduite' %}{% include "_etudes_conduite.html" %}{% elif fonction == 'convocation' %}{% include "_etudes_convocation.html" %}{% elif fonction == 'listes' %}{% set ESP = sous %}{% include "_etudes_secretariat_listes.html" %}{% elif fonction == 'passage' %}{% include "_etudes_passage.html" %}{% elif fonction == 'proclamation' %}{% include "_etudes_proclamation.html" %}{% else %}
+{% if erreur %}<div class="erreur">{{ erreur }}</div>{% endif %}
+
+{% if peut_envoyer %}
+<form method="post" action="{{ url_for('etudes_rapport_envoyer', sous=sous) }}" class="carte">
+  <h2 style="margin:0 0 8px;font-size:1.1rem">Nouveau rapport</h2>
+  <label for="r-date">Date du rapport</label>
+  <input id="r-date" type="date" name="date" value="{{ form.get('date') or aujourdhui }}" max="{{ aujourdhui }}" required>
+  <label for="r-titre">Titre</label>
+  <input id="r-titre" type="text" name="titre" maxlength="150" required value="{{ form.get('titre', '') }}">
+  <label for="r-contenu">Rapport</label>
+  <textarea id="r-contenu" name="contenu" rows="8" maxlength="4000" required style="width:100%">{{ form.get('contenu', '') }}</textarea>
+  <div style="margin-top:10px"><button type="submit">Envoyer au Préfet</button></div>
+</form>
+{% else %}
+<div class="carte"><p class="sous" style="margin:0">Vous pouvez consulter les rapports envoyés, mais pas en envoyer : le droit « Ajout » ne vous est pas accordé.</p></div>
+{% endif %}
+
+<h3 class="sec">Rapports envoyés</h3>
+<div class="carte">
+{% if rapports %}
+  {% for r in rapports %}
+  <details style="padding:8px 0;{{ 'border-top:1px solid var(--bord);' if not loop.first else '' }}">
+    <summary style="cursor:pointer"><b>{{ r.titre }}</b> <span class="sous" style="font-size:.85rem">· {{ r.date }}{% if r.annee %} · {{ r.annee }}{% endif %} · {{ r.auteur }}</span></summary>
+    <p style="margin:6px 0 0;white-space:pre-line">{{ r.contenu }}</p>
+  </details>
+  {% endfor %}
+{% else %}<p class="sous" style="margin:0">Aucun rapport envoyé pour le moment.</p>{% endif %}
+</div>
+{% endif %}

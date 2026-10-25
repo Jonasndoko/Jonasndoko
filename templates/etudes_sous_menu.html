@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block titre %}{{ titre_sous }}{% endblock %}
+{% block entete %}
+{% if menu_utile %}<a class="bouton clair" href="/">Menu</a>{% endif %}
+<span style="font-size:.85rem">{{ s.nom_complet }} · {{ s.libelle_role }}</span>
+<form method="post" action="/deconnexion"><button class="clair" type="submit">Déconnexion</button></form>
+{% endblock %}
+{% block corps %}
+<h1 style="margin-top:0">{{ titre }}</h1>
+<p class="sous" style="margin:0 0 12px">{{ cfg.DESCRIPTIONS_SOUS_MENUS_ETUDES.get(sous, '') }}</p>
+{% if ok %}<div class="succes">{{ ok }}</div>{% endif %}
+{% if sous != 'direction_etudes' %}<p style="margin:0 0 12px"><a class="lien" href="{{ url_for('etudes_horaires') }}">Consulter les horaires publiés &rarr;</a></p>{% endif %}
+{% if prefecture %}{% include "_etudes_prefecture.html" %}{% elif direction %}{% include "_etudes_direction.html" %}{% elif secr %}{% include "_etudes_secretariat.html" %}{% else %}
+<div class="carte"><h2 style="margin-top:0">{{ titre_sous }}</h2>
+<p class="sous" style="margin:0">Ce sous-menu est créé. Ses fonctionnalités seront ajoutées prochainement.</p></div>
+{% endif %}
+{% endblock %}
